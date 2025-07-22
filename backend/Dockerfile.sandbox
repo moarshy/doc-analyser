@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+WORKDIR /workspace
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install claude-code-sdk
+
+# Create directories
+RUN mkdir -p /workspace/repo /workspace/data
+
+# Set working directory for Claude Code
+WORKDIR /workspace
+
+# Default environment variables
+ENV PYTHONPATH=/workspace/repo:$PYTHONPATH
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD python -c "import claude_code_sdk; print('Claude Code SDK available')" || exit 1
+
+# Default command
+CMD ["python", "-c", "print('Claude Code sandbox ready')"]
