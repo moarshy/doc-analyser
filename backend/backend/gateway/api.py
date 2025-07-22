@@ -2,9 +2,12 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, HttpUrl
+import logging
+from backend.gateway.models import AnalysisStatus, AnalysisJob
+from backend.gateway.services import AnalysisService
 
-from .models import AnalysisStatus, AnalysisJob
-from .services import AnalysisService
+logger = logging.getLogger("backend.gateway.api")
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 service = AnalysisService()
@@ -40,6 +43,7 @@ async def analyze_repository(request: RepositoryRequest):
             branch=request.branch,
             include_folders=request.include_folders,
         )
+        logger.info(f"Analysis task queued: {job_id}")
         return AnalysisResponse(
             job_id=job_id,
             status=AnalysisStatus.PENDING,

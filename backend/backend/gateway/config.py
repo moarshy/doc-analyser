@@ -1,10 +1,9 @@
 from typing import List
-from pydantic import BaseSettings
-
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Server settings
-    HOST: str = "0.0.0.0"
+    APP_HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
 
