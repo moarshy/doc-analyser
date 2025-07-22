@@ -7,14 +7,23 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     build-essential \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 RUN pip install --upgrade pip setuptools wheel
-RUN pip install claude-code-sdk
+RUN pip install claude-code-sdk gitpython
+
+# Install Claude Code globally
+RUN npm install -g @anthropic-ai/claude-code
 
 # Create directories
 RUN mkdir -p /workspace/repo /workspace/data
+
+# Copy worker scripts
+COPY backend/worker/use_case.py /workspace/
+COPY backend/worker/execute_use_case.py /workspace/
 
 # Set working directory for Claude Code
 WORKDIR /workspace

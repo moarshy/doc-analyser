@@ -37,8 +37,7 @@ setup: install redis-up
 # Install Python dependencies
 install:
 	@echo "Installing Python dependencies..."
-	cd backend && pip install -e .
-	cd backend && pip install -e .[dev]
+	cd backend && uv sync
 
 # Redis with Docker
 redis-up:
@@ -56,30 +55,25 @@ redis-down:
 # Services
 gateway:
 	@echo "Starting FastAPI gateway..."
-	cd backend && python -m backend.gateway.main
+	cd backend && uv run -m backend.gateway.main
 
 worker:
 	@echo "Starting Celery worker..."
-	cd backend && celery -A backend.worker.celery_app worker --loglevel=info --concurrency=2
+	cd backend && uv run celery -A backend.worker.celery_app worker --loglevel=info --concurrency=2 --queues=analysis,execution
 
 flower:
 	@echo "Starting Celery monitoring..."
-	cd backend && celery -A backend.worker.celery_app flower --port=5555
-
-# Development
-test:
-	@echo "Running tests..."
-	cd backend && python -m pytest tests/ -v
+	cd backend && uv run celery -A backend.worker.celery_app flower --port=5555
 
 format:
 	@echo "Formatting code..."
-	cd backend && black backend/
-	cd backend && isort backend/
+	cd backend && uv run black backend/
+	cd backend && uv run isort backend/
 
 lint:
 	@echo "Linting code..."
-	cd backend && flake8 backend/
-	cd backend && mypy backend/
+	cd backend && uv run flake8 backend/
+	cd backend && uv run mypy backend/
 
 # Cleanup
 clean:
