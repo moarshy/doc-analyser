@@ -3,30 +3,35 @@ import os
 from pathlib import Path
 from typing import Dict, Any, List
 
-from .use_case import extract_use_cases
-from .execute_use_case import execute_use_cases
+from backend.worker.logger import tasks_logger
 
 
 class AnalysisPipeline:
     """Main analysis pipeline for processing repository documentation."""
     
-    def __init__(self, job_id: str, repo_path: str, include_folders: List[str]):
+    def __init__(self, job_id: str, repo_path: str, include_folders: List[str], data_dir: str = None):
         self.job_id = job_id
         self.repo_path = Path(repo_path)
         self.include_folders = include_folders
-        self.results_path = Path(os.getenv("RESULTS_PATH", "/tmp/results"))
+        
+        # Use the data directory structure: ../data/job_id/
+        if data_dir is None:
+            data_dir = os.path.join("..", "data", job_id)
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         
     def run(self) -> Dict[str, Any]:
         """Run the complete analysis pipeline."""
         try:
-            print(f"Starting analysis for job {self.job_id}")
+            tasks_logger.info(f"Starting analysis for job {self.job_id}")
+            tasks_logger.info(f"Results path: {self.results_path}")
             
             # Step 1: Extract use cases from documentation
-            print("Extracting use cases...")
+            tasks_logger.info("Extracting use cases...")
             use_cases = self._extract_use_cases()
             
             if not use_cases:
-                print("No use cases found in documentation")
+                tasks_logger.info("No use cases found in documentation")
                 return {
                     "status": "completed",
                     "use_cases": [],
@@ -35,7 +40,7 @@ class AnalysisPipeline:
                 }
             
             # Step 2: Execute use cases
-            print(f"Executing {len(use_cases)} use cases...")
+            tasks_logger.info(f"Executing {len(use_cases)} use cases...")
             results = self._execute_use_cases(use_cases)
             
             # Step 3: Generate final report
@@ -47,7 +52,7 @@ class AnalysisPipeline:
             return report
             
         except Exception as e:
-            print(f"Analysis failed: {e}")
+            tasks_logger.error(f"Analysis failed: {e}")
             return {
                 "status": "failed",
                 "error": str(e),
@@ -56,52 +61,21 @@ class AnalysisPipeline:
             }
     
     def _extract_use_cases(self) -> List[Dict[str, Any]]:
-        """Extract use cases from documentation."""
-        docs_path = self.repo_path
-        
-        # Find documentation files
-        doc_files = []
-        for folder in self.include_folders:
-            folder_path = self.repo_path / folder
-            if folder_path.exists():
-                for ext in ["*.md", "*.rst", "*.txt"]:
-                    doc_files.extend(folder_path.rglob(ext))
-        
-        if not doc_files:
-            print("No documentation files found")
-            return []
-        
-        # Run use case extraction
-        extraction_result = extract_use_cases(
-            repo_path=str(self.repo_path),
-            doc_files=[str(f) for f in doc_files]
-        )
-        
-        return extraction_result.get("use_cases", [])
+        """Extract use cases from documentation using Docker runner."""
+        # This should be handled by Docker runner's two-phase execution
+        # Phase 1: Extract use cases
+        use_cases_path = self.data_dir / "data" / "use_cases.json"
+        if use_cases_path.exists():
+            with open(use_cases_path) as f:
+                data = json.load(f)
+                return data.get("use_cases", [])
+        return []
     
     def _execute_use_cases(self, use_cases: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Execute all use cases."""
-        results = {}
-        
-        for i, use_case in enumerate(use_cases):
-            print(f"Executing use case {i+1}/{len(use_cases)}: {use_case.get('name', 'Unknown')}")
-            
-            try:
-                result = execute_use_cases(
-                    use_case=use_case,
-                    repo_path=str(self.repo_path),
-                    include_folders=self.include_folders
-                )
-                results[use_case.get("name", f"use_case_{i}")] = result
-                
-            except Exception as e:
-                print(f"Failed to execute use case {use_case.get('name', 'Unknown')}: {e}")
-                results[use_case.get("name", f"use_case_{i}")] = {
-                    "status": "failed",
-                    "error": str(e)
-                }
-        
-        return results
+        """Execute use cases - handled by Docker runner."""
+        # The Docker runner handles both extraction and execution phases
+        # This method is now a placeholder as the actual execution happens in Docker
+        return {}
     
     def _generate_report(self, use_cases: List[Dict], results: Dict[str, Any]) -> Dict[str, Any]:
         """Generate comprehensive analysis report."""
@@ -212,12 +186,12 @@ class AnalysisPipeline:
     
     def _save_results(self, report: Dict[str, Any]):
         """Save analysis results to file."""
-        results_file = self.results_path / "results.json"
+        results_file = self.data_dir / "results.json"
         
         with open(results_file, "w") as f:
             json.dump(report, f, indent=2)
         
-        print(f"Results saved to {results_file}")
+        tasks_logger.info(f"Results saved to {results_file}")
 
 
 if __name__ == "__main__":
@@ -228,4 +202,4 @@ if __name__ == "__main__":
     
     pipeline = AnalysisPipeline(job_id, repo_path, include_folders)
     results = pipeline.run()
-    print(json.dumps(results, indent=2))
+    tasks_logger.info(json.dumps(results, indent=2))

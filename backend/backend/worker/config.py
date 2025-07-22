@@ -1,5 +1,12 @@
 import os
 from typing import List
+from dotenv import load_dotenv
+
+import logging
+
+logger = logging.getLogger("backend.worker.config")
+
+load_dotenv()
 
 
 class WorkerConfig:
@@ -20,6 +27,8 @@ class WorkerConfig:
     
     # Claude Code settings
     CLAUDE_CODE_TIMEOUT = int(os.getenv("CLAUDE_CODE_TIMEOUT", "3600"))  # 1 hour
+    ANTHROPIC_AUTH_TOKEN = os.getenv("ANTHROPIC_AUTH_TOKEN", "")
+    ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "")
     
     # Git settings
     GIT_CLONE_TIMEOUT = int(os.getenv("GIT_CLONE_TIMEOUT", "300"))  # 5 minutes
