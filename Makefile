@@ -59,7 +59,7 @@ gateway:
 
 worker:
 	@echo "Starting Celery worker..."
-	cd backend && uv run celery -A backend.worker.celery_app worker --loglevel=info --concurrency=2 --queues=analysis,execution
+	cd backend && uv run celery -A backend.worker.celery_app worker --loglevel=info --concurrency=5 --queues=analysis,execution
 
 flower:
 	@echo "Starting Celery monitoring..."

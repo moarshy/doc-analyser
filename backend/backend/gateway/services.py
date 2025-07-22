@@ -37,26 +37,27 @@ class AnalysisService:
             updated_at=datetime.utcnow(),
         )
         
-        # Store job in Redis
+        # Store job in Redis using simplified structure
         job_data = {
-            "id": str(job_id),
-            "repository_url": url,
-            "branch": branch,
-            "include_folders": include_folders,
-            "status": AnalysisStatus.PENDING.value,
+            "status": "pending",
+            "total_use_cases": 0,
+            "completed": 0,
+            "failed": 0,
+            "pending": 0,
+            "job_params": {
+                "repository_url": url,
+                "branch": branch,
+                "include_folders": include_folders,
+                "job_id": str(job_id),
+            },
+            "use_cases": {},
             "created_at": job.created_at.isoformat(),
-            "updated_at": job.updated_at.isoformat(),
+            "updated_at": job.updated_at.isoformat()
         }
         
         if not self.redis.store_job(job_id, job_data):
             logger.error(f"Failed to store job {job_id} in Redis")
             raise RuntimeError("Failed to store job")
-
-        # Store initial status
-        self.redis.store_job_status(job_id, AnalysisStatus.PENDING.value, {
-            "message": "Job submitted",
-            "task_id": str(job_id)
-        })
 
         # Queue the analysis task
         task = celery_app.send_task(
@@ -67,6 +68,7 @@ class AnalysisService:
                 branch,
                 include_folders,
             ],
+            task_id=str(job_id)  # Use job_id as task_id for consistency
         )
         logger.info(f"Analysis task queued: {task.id}")
         return job_id
@@ -78,18 +80,19 @@ class AnalysisService:
         if not job_data:
             raise ValueError(f"Job {job_id} not found")
 
-        # Create AnalysisJob from Redis data
+        # Create AnalysisJob from Redis data using simplified structure
+        job_params = job_data.get("job_params", {})
         job = AnalysisJob(
-            id=UUID(job_data["id"]),
-            repository_url=job_data["repository_url"],
-            branch=job_data["branch"],
-            include_folders=job_data["include_folders"],
-            status=AnalysisStatus(job_data["status"]),
-            created_at=datetime.fromisoformat(job_data["created_at"]),
-            updated_at=datetime.fromisoformat(job_data["updated_at"]),
+            id=job_id,
+            repository_url=job_params.get("repository_url", ""),
+            branch=job_params.get("branch", "main"),
+            include_folders=job_params.get("include_folders", ["docs"]),
+            status=AnalysisStatus(job_data.get("status", "pending")),
+            created_at=datetime.fromisoformat(job_data.get("created_at", datetime.utcnow().isoformat())),
+            updated_at=datetime.fromisoformat(job_data.get("updated_at", datetime.utcnow().isoformat())),
             results=job_data.get("results"),
             error=job_data.get("error"),
-            use_cases=job_data.get("use_cases", [])
+            use_cases=list(job_data.get("use_cases", {}).values())
         )
         
         # Check Celery task status for updates
@@ -106,16 +109,10 @@ class AnalysisService:
                     
                     # Update Redis with completed status
                     job_data.update({
-                        "status": AnalysisStatus.COMPLETED.value,
-                        "results": result,
-                        "use_cases": result.get("use_cases", []),
+                        "status": "completed",
                         "updated_at": datetime.now(timezone.utc).isoformat()
                     })
                     self.redis.store_job(job_id, job_data)
-                    self.redis.store_job_status(job_id, AnalysisStatus.COMPLETED.value, {
-                        "message": "Analysis completed",
-                        "result": result
-                    })
                 else:
                     error = str(task.result)
                     job.error = error
@@ -123,15 +120,11 @@ class AnalysisService:
                     
                     # Update Redis with failed status
                     job_data.update({
-                        "status": AnalysisStatus.FAILED.value,
+                        "status": "failed",
                         "error": error,
                         "updated_at": datetime.now(timezone.utc).isoformat()
                     })
                     self.redis.store_job(job_id, job_data)
-                    self.redis.store_job_status(job_id, AnalysisStatus.FAILED.value, {
-                        "message": "Analysis failed",
-                        "error": error
-                    })
                 
                 job.updated_at = datetime.utcnow()
 
@@ -154,23 +147,3 @@ class AnalysisService:
         
         return jobs
 
-    async def update_job_status(self, job_id: UUID, status: str, **kwargs):
-        """Update job status in Redis."""
-        job_data = self.redis.get_job(job_id)
-        if job_data:
-            job_data.update({
-                "status": status,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                **kwargs
-            })
-            self.redis.store_job(job_id, job_data)
-            self.redis.store_job_status(job_id, status, kwargs)
-
-    def update_job(self, job_id: UUID, **kwargs):
-        """Update a job's status and results."""
-        if job_id in self._jobs:
-            job = self._jobs[job_id]
-            for key, value in kwargs.items():
-                if hasattr(job, key):
-                    setattr(job, key, value)
-            job.updated_at = datetime.utcnow()
