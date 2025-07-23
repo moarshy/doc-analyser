@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-
+from datetime import datetime, timezone
 from claude_code_sdk import query, ClaudeCodeOptions
 
 # Set up logger
@@ -17,27 +17,28 @@ if not logger.handlers:
     )
 
 PROMPT = """
-Here is the use case:
+You are a senior coding assistant.
+You will try to execute the use case.
+In doing so, you will need to use the documentation to understand the use case. You will identify the usefulness of the documentation.
+
+Here is the use case you need to implement:
 Use Case Name: {use_case_name}
 Use Case Description: {use_case_description}
 Use Case Success Criteria: {use_case_success_criteria}
 Use Case Difficulty Level: {use_case_difficulty_level}
 Use Case Documentation Source: {use_case_documentation_source}
 
-You are a senior coding assistant.
-You will try to execute the use case.
-In doing so, you will need to use the documentation to understand the use case. You will identify the usefulness of the documentation.
 
 INSTRUCTIONS:
-1. Understand the use case.
-2. Use the documentation to understand the use case.
-3. Save the code as {code_file_name}.py or {code_file_name}.js
-4. Execute the code and see if it works.
-5. Keep track of how the documentation was used to execute the use case.
-6. In the end, you will need to produce a json file with the execution results.
-7. It is important that you use the underlying library to implement the use case.
-8. YOU MUST USE THE LIBRARY TO IMPLEMENT THE USE CASE.
-9. You must first install the library and its dependencies.
+1. Use the documentation to understand the use case.
+2. MUST save the working code as {code_file_name}.py or {code_file_name}.js (choose the appropriate extension based on the language)
+3. Execute the code and see if it works.
+4. Keep track of how the documentation was used to execute the use case.
+5. MUST save the final results as {results_file_name} in JSON format
+6. It is important that you use the underlying library to implement the use case.
+7. YOU MUST USE THE LIBRARY TO IMPLEMENT THE USE CASE.
+8. You must first install the library and its dependencies. 
+9. CRITICAL: Ensure both files ({code_file_name}.py/.js or other language extension) and {results_file_name} are created in the working directory.
 
 OUTPUT_FORMAT:
 
@@ -64,7 +65,7 @@ Repository Context:
 - Focus on documentation in these folders to understand how to implement the use case
 - Look for examples, API references, tutorials, and guides
 
-Remember: Your goal is to evaluate how well the documentation enables someone to implement this use case successfully.
+Remember: Your goal is to evaluate how well the documentation enables someone to implement this use case successfully based on the repository context.
 """
 
 SYSTEM_PROMPT = """
@@ -84,8 +85,9 @@ async def execute_use_case(prompt: str, cwd: str):
         system_prompt=SYSTEM_PROMPT,
         cwd=cwd,
         allowed_tools=[
-            "Read", "Write", "Edit", "LS", "MultiEdit",
-            "Glob", "Grep", "Task",  # Fixed missing comma
+            "Read", "Write", "Edit", 
+            "LS", "MultiEdit",
+            "Glob", "Grep", "Task",  
             "Bash", "NotebookRead",
             "TodoWrite", "exit_plan_mode"
         ]
@@ -172,43 +174,6 @@ async def execute_use_cases(cwd: str, use_case_json_path: str, repo_path: str, i
             continue
 
     logger.info("All use cases completed!")
-
-def execute_single_use_case(use_case: dict, repo_path: str, output_dir: str, include_folders: list[str]):
-    """Execute a single use case.
-    
-    Args:
-        use_case: The use case to execute
-        repo_path: Path to repository
-        output_dir: Directory to save results
-        include_folders: Folders to include
-    """
-    import asyncio
-    import os
-    
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Handle both string and list formats for success_criteria
-    success_criteria = use_case.get("success_criteria", [])
-    if isinstance(success_criteria, list):
-        success_criteria_str = "\n".join(f"- {criterion}" for criterion in success_criteria)
-    else:
-        success_criteria_str = str(success_criteria)
-    
-    include_folders_str = ", ".join(include_folders) if isinstance(include_folders, list) else str(include_folders)
-    
-    # Format prompt
-    prompt = PROMPT.format(
-        use_case_name=use_case.get("name", "Unnamed Use Case"),
-        use_case_description=use_case.get("description", "No description provided"),
-        use_case_success_criteria=success_criteria_str,
-        use_case_difficulty_level=use_case.get("difficulty_level", "Unknown"),
-        use_case_documentation_source=use_case.get("documentation_source", "Unknown"),
-        code_file_name=use_case.get("name", "use_case").replace(" ", "_").lower(),
-        results_file_name=f"{use_case.get('name', 'use_case').replace(' ', '_').lower()}_results.json",
-        cwd=output_dir,
-        include_folders=include_folders_str
-    )
     
 async def execute_single_use_case_by_id(use_case_json_path: str, output_dir: str, use_case_id: int, include_folders: list[str], repo_path: str = "/workspace/repo"):
     """Execute a specific use case by ID.
@@ -245,11 +210,16 @@ async def execute_single_use_case_by_id(use_case_json_path: str, output_dir: str
     logger.info(f"Executing use case {use_case_id}: {use_case.get('name', 'Unnamed')}")
     
     # Execute the single use case
-    await execute_single_use_case_async(use_case, repo_path, output_dir, include_folders)
+    await execute_single_use_case_async(use_case, repo_path, output_dir, include_folders, use_case_id)
 
-async def execute_single_use_case_async(use_case: dict, repo_path: str, output_dir: str, include_folders: list[str]):
-    """Async version of execute_single_use_case."""
+async def execute_single_use_case_async(use_case: dict, repo_path: str, output_dir: str, include_folders: list[str], use_case_index: int):
+    """Async version of execute_single_use_case with file generation."""
     # Ensure output directory exists
+    logger.info(f"Output directory: {output_dir}")
+    logger.info(f"Include folders: {include_folders}")
+    logger.info(f"Use case index: {use_case_index}")
+    logger.info(f"Use case: {use_case}")
+    logger.info(f"Repo path: {repo_path}")
     os.makedirs(output_dir, exist_ok=True)
     
     # Handle both string and list formats for success_criteria
@@ -261,25 +231,46 @@ async def execute_single_use_case_async(use_case: dict, repo_path: str, output_d
     
     include_folders_str = ", ".join(include_folders) if isinstance(include_folders, list) else str(include_folders)
     
+    # Generate file names with index
+    code_file_name = f"use_case_{use_case_index}"
+    results_file_name = f"use_case_results_{use_case_index}.json"
+
+    logger.info(f"Code file name: {code_file_name}")
+    logger.info(f"Results file name: {results_file_name}")
+    
     # Format prompt
-    use_case_name = use_case.get("name", "Unnamed Use Case").replace(" ", "_").lower()
     prompt = PROMPT.format(
-        use_case_name=use_case.get("name", "Unnamed Use Case"),
+        use_case_name=use_case.get("name", f"Use Case {use_case_index}"),
         use_case_description=use_case.get("description", "No description provided"),
         use_case_success_criteria=success_criteria_str,
         use_case_difficulty_level=use_case.get("difficulty_level", "Unknown"),
         use_case_documentation_source=use_case.get("documentation_source", "Unknown"),
-        code_file_name=use_case_name,
-        results_file_name=f"{use_case_name}_results.json",
+        code_file_name=code_file_name,
+        results_file_name=results_file_name,
         cwd=output_dir,
         include_folders=include_folders_str
     )
+    logger.info(f"Prompt: {prompt}")
     
     try:
+        # Execute the use case and get generated code
         await execute_use_case(prompt, output_dir)
-        logger.info(f"Use case execution completed: {use_case.get('name', 'Unnamed')}")
+        
     except Exception as e:
-        logger.error(f"Error executing use case: {e}")
+        logger.error(f"Error executing use case {use_case_index}: {e}")
+        
+        # Save error results
+        error_results = {
+            "use_case_name": use_case.get("name", f"Use Case {use_case_index}"),
+            "use_case_index": use_case_index,
+            "error": str(e),
+            "success": False,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        error_file_path = os.path.join(output_dir, results_file_name)
+        with open(error_file_path, "w") as f:
+            json.dump(error_results, f, indent=2, default=str)
 
 if __name__ == "__main__":
     import sys
@@ -320,7 +311,18 @@ if __name__ == "__main__":
         print(f"Include folders: {include_folders}")
         
         try:
-            asyncio.run(execute_use_cases(output_dir, use_case_json_path, "/workspace/repo", include_folders))
+            # Read use cases
+            with open(use_case_json_path, "r") as f:
+                data = json.load(f)
+            use_cases = data.get('use_cases', data) if isinstance(data, dict) else data
+            
+            # Execute each use case with index
+            for i, use_case in enumerate(use_cases):
+                print(f"Executing use case {i}: {use_case.get('name', 'Unnamed')}")
+                asyncio.run(execute_single_use_case_async(
+                    use_case, "/workspace/repo", output_dir, include_folders, i
+                ))
+                
         except KeyboardInterrupt:
             print("\nExecution interrupted by user")
         except Exception as e:

@@ -1,10 +1,11 @@
 from typing import List, Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, HttpUrl
 import logging
-from backend.gateway.models import AnalysisStatus, AnalysisJob
+from backend.models.analysis import AnalysisStatus, AnalysisJob
 from backend.gateway.services import AnalysisService
+from backend.common.auth import get_current_user
 
 logger = logging.getLogger("backend.gateway.api")
 logger = logging.getLogger(__name__)
@@ -85,3 +86,8 @@ async def list_jobs(skip: int = 0, limit: int = 100):
         )
         for job in jobs
     ]
+
+
+# Import and include auth router
+from backend.routers.auth import router as auth_router
+router.include_router(auth_router, prefix="/auth")

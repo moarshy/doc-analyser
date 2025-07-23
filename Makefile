@@ -1,4 +1,4 @@
-.PHONY: help setup install redis-up redis-down gateway worker test clean
+.PHONY: help setup install redis-up redis-down redis-fresh gateway worker test clean clean-containers logs-containers
 
 # Default target
 help:
@@ -12,6 +12,7 @@ help:
 	@echo "Infrastructure Commands:"
 	@echo "  make redis-up    - Start Redis with Docker"
 	@echo "  make redis-down  - Stop Redis"
+	@echo "  make redis-fresh - Stop Redis and restart with fresh volume"
 	@echo ""
 	@echo "Service Commands:"
 	@echo "  make gateway     - Start FastAPI gateway"
@@ -21,6 +22,8 @@ help:
 	@echo "Development Commands:"
 	@echo "  make test        - Run tests"
 	@echo "  make clean       - Clean up temporary files"
+	@echo "  make clean-containers - Stop and remove all sandbox containers"
+	@echo "  make logs-containers  - Show logs of all running sandbox containers"
 	@echo "  make format      - Format code"
 	@echo "  make lint        - Lint code"
 	@echo ""
@@ -44,6 +47,7 @@ redis-up:
 	@echo "Starting Redis..."
 	docker run -d --name doc-analyser-redis \
 		-p 6379:6379 \
+		-v doc-analyser-redis-data:/data \
 		--restart unless-stopped \
 		redis:7-alpine
 
@@ -51,6 +55,18 @@ redis-down:
 	@echo "Stopping Redis..."
 	docker stop doc-analyser-redis || true
 	docker rm doc-analyser-redis || true
+
+redis-fresh:
+	@echo "Stopping Redis and cleaning volume..."
+	docker stop doc-analyser-redis || true
+	docker rm doc-analyser-redis || true
+	docker volume rm doc-analyser-redis-data || true
+	@echo "Starting fresh Redis with new volume..."
+	docker run -d --name doc-analyser-redis \
+		-p 6379:6379 \
+		-v doc-analyser-redis-data:/data \
+		--restart unless-stopped \
+		redis:7-alpine
 
 # Services
 gateway:
@@ -83,6 +99,18 @@ clean:
 	find . -type d -name "*.egg-info" -exec rm -rf {} +
 	docker stop doc-analyser-redis || true
 	docker rm doc-analyser-redis || true
+
+# Clean up sandbox containers
+clean-containers:
+	@echo "Stopping and removing all doc-analyser-sandbox containers..."
+	@docker ps -q --filter ancestor=doc-analyser-sandbox:latest | xargs -r docker stop || true
+	@docker ps -a -q --filter ancestor=doc-analyser-sandbox:latest | xargs -r docker rm -f || true
+	@echo "Sandbox containers cleaned up!"
+
+# Show logs of all running sandbox containers
+logs-containers:
+	@echo "Showing logs of all running doc-analyser-sandbox containers..."
+	@docker ps -q --filter ancestor=doc-analyser-sandbox:latest | xargs -I {} sh -c 'echo "=== Container {} ===" && docker logs {} --tail=50 && echo ""'
 	
 # Check health
 health:

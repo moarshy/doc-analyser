@@ -28,25 +28,68 @@ class AnalysisTask(Task):
         super().on_success(retval, task_id, args, kwargs)
 
 
-@celery_app.task(base=AnalysisTask, bind=True, name="analyze_repository")
-def analyze_repository(
+
+
+@celery_app.task(base=AnalysisTask, bind=True, name="extract_use_cases")
+def extract_use_cases(
+    self,
+    job_id: str,
+    repo_path: str,
+    include_folders: List[str],
+    output_dir: str,
+) -> List[Dict[str, Any]]:
+    """Extract use cases from repository documentation."""
+    
+    redis_client = get_redis_client()
+    
+    try:
+        redis_client.update_job_field(UUID(job_id), "status", "extracting_use_cases")
+        self.update_state(state="PROCESSING", meta={"status": "Running extraction in Docker"})
+        
+        # Run extraction in Docker
+        docker_runner = DockerRunner()
+        extraction_result = docker_runner.extract_use_cases(
+            job_id=job_id,
+            repo_path=repo_path,
+            include_folders=include_folders,
+            output_dir=output_dir
+        )
+        
+        # Read extracted use cases
+        use_cases_path = os.path.join(output_dir, "use_cases.json")
+        use_cases = []
+        if os.path.exists(use_cases_path):
+            with open(use_cases_path) as f:
+                data = json.load(f)
+                use_cases = data.get("use_cases", [])
+        
+        return use_cases
+        
+    except Exception as e:
+        redis_client.update_job_field(UUID(job_id), "status", "extraction_failed")
+        redis_client.update_job_field(UUID(job_id), "error", str(e))
+        raise RuntimeError(str(e))
+
+
+@celery_app.task(base=AnalysisTask, bind=True, name="orchestrate_analysis")
+def orchestrate_analysis(
     self,
     job_id: str,
     repository_url: str,
     branch: str = "main",
     include_folders: List[str] = None,
 ) -> Dict[str, Any]:
-    """Extract use cases from repository documentation."""
+    """Single task that orchestrates the entire analysis workflow with Docker pool."""
     if include_folders is None:
         include_folders = ["docs"]
     
     redis_client = get_redis_client()
     
     try:
-        # Initialize job directories with correct structure
+        # Initialize job directories
         data_dir = os.path.join(WorkerConfig.DATA_DIR, job_id)
         repo_dir = os.path.join(data_dir, "repo")
-        output_dir = os.path.join(data_dir, "data")  # All output files here
+        output_dir = os.path.join(data_dir, "data")
         
         os.makedirs(data_dir, exist_ok=True)
         os.makedirs(repo_dir, exist_ok=True)
@@ -55,53 +98,43 @@ def analyze_repository(
         # Update job with paths and status
         redis_client.update_job_field(UUID(job_id), "repo_path", repo_dir)
         redis_client.update_job_field(UUID(job_id), "data_path", output_dir)
-        redis_client.update_job_field(UUID(job_id), "status", "extracting")
-        self.update_state(state="PROCESSING", meta={"status": "Extracting use cases"})
+        redis_client.update_job_field(UUID(job_id), "status", "cloning")
+        self.update_state(state="PROCESSING", meta={"status": "Cloning repository"})
         
         # Clone repository
         repo = Repo.clone_from(repository_url, repo_dir, branch=branch)
         
-        # Extract use cases using Docker
+        # Update status to extracting
+        redis_client.update_job_field(UUID(job_id), "status", "extracting")
+        self.update_state(state="PROCESSING", meta={"status": "Extracting use cases"})
+        
+        # Run extraction
         docker_runner = DockerRunner()
-        try:
-            extraction_result = docker_runner.extract_use_cases(
-                job_id=job_id,
-                repo_path=repo_dir,
-                include_folders=include_folders,
-                output_dir=output_dir  # All files go to data_path/job_id/data/
-            )
-            
-            # Read extracted use cases
-            use_cases_path = os.path.join(output_dir, "use_cases.json")
-            use_cases = []
-            if os.path.exists(use_cases_path):
-                with open(use_cases_path) as f:
-                    data = json.load(f)
-                    use_cases = data.get("use_cases", [])
-            else:
-                # Check for error logs
-                error_log_path = os.path.join(data_dir, "data", "extraction_error.log")
-                if os.path.exists(error_log_path):
-                    with open(error_log_path) as f:
-                        error_content = f.read()
-                        raise RuntimeError(f"Use case extraction failed: {error_content}")
-                
-                use_cases = []  # Default empty list if no file
-                
-        except Exception as e:
-            # Capture detailed error information
-            error_details = {
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "repo_path": repo_dir,
-                "include_folders": include_folders,
-                "data_path": output_dir
+        extraction_result = docker_runner.extract_use_cases(
+            job_id=job_id,
+            repo_path=repo_dir,
+            include_folders=include_folders,
+            output_dir=output_dir
+        )
+        
+        # Read extracted use cases
+        use_cases_path = os.path.join(output_dir, "use_cases.json")
+        use_cases = []
+        if os.path.exists(use_cases_path):
+            with open(use_cases_path) as f:
+                data = json.load(f)
+                use_cases = data.get("use_cases", [])
+        
+        if not use_cases:
+            redis_client.update_job_field(UUID(job_id), "status", "completed")
+            return {
+                "job_id": job_id,
+                "repository": repository_url,
+                "branch": branch,
+                "use_cases": [],
+                "status": "completed",
+                "message": "No use cases found in repository"
             }
-            tasks_logger.error(f"Use case extraction failed: {error_details}")
-            redis_client.update_job_field(UUID(job_id), "status", "failed")
-            redis_client.update_job_field(UUID(job_id), "error", str(e))
-            redis_client.update_job_field(UUID(job_id), "error_details", error_details)
-            raise RuntimeError(str(e))
         
         # Update Redis with extracted use cases
         job_data = redis_client.get_job(UUID(job_id))
@@ -113,33 +146,51 @@ def analyze_repository(
             } for i, uc in enumerate(use_cases)}
             job_data["total_use_cases"] = len(use_cases)
             job_data["pending"] = len(use_cases)
-            job_data["status"] = "queued"
+            job_data["completed"] = 0
+            job_data["failed"] = 0
+            job_data["status"] = "executing"
             redis_client.store_job(UUID(job_id), job_data)
         
-        # Queue individual use case execution tasks
-        for i, use_case in enumerate(use_cases):
-            execute_single_use_case.delay(
-                job_id=job_id,  # Keep as string for consistency
-                use_case_index=i,
-                use_case=use_case,
-                repo_path=repo_dir,
-                output_dir=output_dir,  # All files go to data_path/job_id/data/
-                include_folders=include_folders
-            )
+        # Execute use cases with Docker pool
+        redis_client.update_job_field(UUID(job_id), "status", "executing")
+        self.update_state(state="PROCESSING", meta={"status": "Executing use cases with Docker pool"})
+        
+        results = docker_runner.execute_use_cases_with_pool(
+            job_id=job_id,
+            use_cases=use_cases,
+            repo_path=repo_dir,
+            output_dir=output_dir,
+            include_folders=include_folders,
+            pool_size=5,
+            redis_client=redis_client,
+            task_context=self  # Pass task context for status updates
+        )
+        
+        # Update final status
+        completed_count = sum(1 for r in results if r.get("status") == "completed")
+        failed_count = len(results) - completed_count
+        final_status = "completed" if failed_count == 0 else "completed_with_errors"
+        
+        redis_client.update_job_field(UUID(job_id), "status", final_status)
+        redis_client.update_job_field(UUID(job_id), "completed", completed_count)
+        redis_client.update_job_field(UUID(job_id), "failed", failed_count)
+        redis_client.update_job_field(UUID(job_id), "pending", 0)
         
         return {
             "job_id": job_id,
             "repository": repository_url,
             "branch": branch,
             "use_cases": use_cases,
-            "status": "queued",
-            "execution_method": "parallel_celery",
+            "status": final_status,
+            "execution_method": "docker_pool",
             "total_use_cases": len(use_cases),
-            "message": f"Queued {len(use_cases)} use cases for parallel execution"
+            "completed": completed_count,
+            "failed": failed_count,
+            "results": results,
+            "message": f"Completed execution of {len(use_cases)} use cases using Docker pool"
         }
         
     except Exception as e:
-        # Capture detailed error information for proper serialization
         error_info = {
             "error": str(e),
             "error_type": type(e).__name__,
@@ -149,109 +200,4 @@ def analyze_repository(
         redis_client.update_job_field(UUID(job_id), "error", str(e))
         redis_client.update_job_field(UUID(job_id), "error_details", error_info)
         self.update_state(state="FAILURE", meta={"error": str(e), "error_type": type(e).__name__})
-        raise RuntimeError(str(e))
-
-
-@celery_app.task(base=AnalysisTask, bind=True, name="execute_single_use_case")
-def execute_single_use_case(
-    self,
-    job_id: str,
-    use_case_index: int,
-    use_case: Dict[str, Any],
-    repo_path: str,
-    output_dir: str,
-    include_folders: List[str],
-) -> Dict[str, Any]:
-    """Execute a single use case in a Docker container."""
-    
-    redis_client = get_redis_client()
-    
-    try:
-        # Update Redis status
-        job_data = redis_client.get_job(UUID(job_id)) or {}
-        use_cases = job_data.get("use_cases", {})
-        
-        if str(use_case_index) in use_cases:
-            use_cases[str(use_case_index)]["status"] = "running"
-            redis_client.update_job_field(UUID(job_id), "use_cases", use_cases)
-        
-        self.update_state(state="PROCESSING", meta={
-            "use_case_index": use_case_index,
-            "use_case_name": use_case.get("name", f"Use Case {use_case_index}")
-        })
-        
-        # Execute use case in Docker
-        docker_runner = DockerRunner()
-        result = docker_runner.execute_single_use_case(
-            job_id=job_id,
-            use_case_index=use_case_index,
-            use_case=use_case,
-            repo_path=repo_path,
-            output_dir=output_dir,
-            include_folders=include_folders
-        )
-        
-        # Update Redis with result
-        job_data = redis_client.get_job(UUID(job_id)) or {}
-        use_cases = job_data.get("use_cases", {})
-        
-        if str(use_case_index) in use_cases:
-            use_cases[str(use_case_index)].update({
-                "status": "completed" if result["exit_code"] == 0 else "failed",
-                "result": result,
-                "completed_at": str(datetime.now(timezone.utc))
-            })
-            
-            # Update counters
-            job_data["use_cases"] = use_cases
-            completed = sum(1 for uc in use_cases.values() if uc.get("status") == "completed")
-            failed = sum(1 for uc in use_cases.values() if uc.get("status") == "failed")
-            
-            job_data.update({
-                "completed": completed,
-                "failed": failed,
-                "pending": job_data.get("total_use_cases", 0) - completed - failed
-            })
-            
-            if job_data.get("pending", 0) == 0:
-                job_data["status"] = "completed"
-            
-            redis_client.store_job(UUID(job_id), job_data)
-        
-        return {
-            "job_id": job_id,
-            "use_case_index": use_case_index,
-            "use_case_name": use_case.get("name"),
-            "status": "completed" if result["exit_code"] == 0 else "failed",
-            "result": result
-        }
-        
-    except Exception as e:
-        # Update Redis with error using proper serialization
-        error_info = {
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "timestamp": str(datetime.now(timezone.utc))
-        }
-        
-        job_data = redis_client.get_job(UUID(job_id)) or {}
-        use_cases = job_data.get("use_cases", {})
-        
-        if str(use_case_index) in use_cases:
-            use_cases[str(use_case_index)].update({
-                "status": "failed",
-                "error": str(e),
-                "error_details": error_info
-            })
-            job_data["use_cases"] = use_cases
-            job_data["failed"] = job_data.get("failed", 0) + 1
-            job_data["pending"] = max(0, job_data.get("pending", 0) - 1)
-            job_data["status"] = "completed" if job_data.get("pending", 0) == 0 else "processing"
-            redis_client.store_job(UUID(job_id), job_data)
-        
-        self.update_state(state="FAILURE", meta={
-            "use_case_index": use_case_index,
-            "error": str(e),
-            "error_type": type(e).__name__
-        })
         raise RuntimeError(str(e))

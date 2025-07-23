@@ -56,6 +56,7 @@ class RedisClient:
                 self.DEFAULT_TTL,
                 json.dumps(job_data, default=str)
             )
+            logger.info(f"Stored job {job_id} in Redis with key {key}")
             return True
         except RedisError as e:
             logger.error(f"Failed to store job {job_id}: {e}")
@@ -73,7 +74,12 @@ class RedisClient:
         try:
             key = self.JOB_KEY.format(job_id=job_id)
             data = self.client.get(key)
-            return json.loads(data) if data else None
+            if data:
+                logger.debug(f"Found job {job_id} in Redis")
+                return json.loads(data)
+            else:
+                logger.warning(f"Job {job_id} not found in Redis (key: {key})")
+                return None
         except RedisError as e:
             logger.error(f"Failed to get job {job_id}: {e}")
             return None
@@ -94,7 +100,20 @@ class RedisClient:
         """
         try:
             key = self.JOB_KEY.format(job_id=job_id)
-            job_data = self.get_job(job_id) or {}
+            job_data = self.get_job(job_id)
+            
+            if job_data is None:
+                logger.warning(f"Job {job_id} not found in Redis when trying to update field {field}, creating new job data")
+                job_data = {
+                    "status": "pending",
+                    "total_use_cases": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "pending": 0,
+                    "use_cases": {},
+                    "created_at": str(datetime.now(timezone.utc))
+                }
+            
             job_data[field] = value
             job_data["updated_at"] = str(datetime.now(timezone.utc))
             
@@ -103,6 +122,7 @@ class RedisClient:
                 self.DEFAULT_TTL,
                 json.dumps(job_data, default=str)
             )
+            logger.debug(f"Updated job {job_id} field {field}")
             return True
         except RedisError as e:
             logger.error(f"Failed to update job field {job_id}.{field}: {e}")

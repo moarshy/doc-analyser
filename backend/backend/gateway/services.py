@@ -7,7 +7,7 @@ import logging
 from celery.result import AsyncResult
 
 from backend.worker.celery_app import celery_app
-from backend.gateway.models import AnalysisJob, AnalysisStatus
+from backend.models.analysis import AnalysisJob, AnalysisStatus
 from backend.common.redis_client import get_redis_client
 from backend.worker.logger import tasks_logger
 
@@ -58,10 +58,12 @@ class AnalysisService:
         if not self.redis.store_job(job_id, job_data):
             logger.error(f"Failed to store job {job_id} in Redis")
             raise RuntimeError("Failed to store job")
+        else:
+            logger.info(f"Successfully stored job {job_id} in Redis")
 
-        # Queue the analysis task
+        # Queue the orchestrated analysis task
         task = celery_app.send_task(
-            "analyze_repository",
+            "orchestrate_analysis",
             args=[
                 str(job_id),
                 url,

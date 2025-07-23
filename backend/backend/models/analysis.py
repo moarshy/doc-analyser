@@ -9,8 +9,15 @@ from pydantic import BaseModel, HttpUrl
 class AnalysisStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
+    CLONING = "cloning"
+    EXTRACTING = "extracting"
+    EXTRACTING_USE_CASES = "extracting_use_cases"
+    EXECUTING = "executing"
     COMPLETED = "completed"
+    COMPLETED_WITH_ERRORS = "completed_with_errors"
     FAILED = "failed"
+    EXTRACTION_FAILED = "extraction_failed"
+    TIMEOUT = "timeout"
 
 
 class AnalysisJob(BaseModel):
@@ -21,6 +28,7 @@ class AnalysisJob(BaseModel):
     status: AnalysisStatus
     created_at: datetime
     updated_at: datetime
+    user_id: Optional[str] = None  # Auth0 user_id
     use_cases: Optional[List[Dict]] = None
     results: Optional[Dict] = None
     error: Optional[str] = None

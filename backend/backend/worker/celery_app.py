@@ -37,6 +37,6 @@ celery_app.conf.update(
 
 # Configure task routing
 celery_app.conf.task_routes = {
-    "analyze_repository": {"queue": "analysis"},
-    "execute_single_use_case": {"queue": "execution"},
+    "extract_use_cases": {"queue": "analysis"},
+    "orchestrate_analysis": {"queue": "analysis"},
 }
