@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+router = APIRouter(tags=["projects"])
 
 @router.post("/", response_model=ProjectResponse)
 async def create_project(

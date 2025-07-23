@@ -38,3 +38,38 @@ class JobCreate(BaseModel):
     repository_url: HttpUrl
     branch: str = "main"
     include_folders: List[str] = ["docs"]
+
+
+class AnalysisResult(BaseModel):
+    job_id: UUID
+    status: AnalysisStatus
+    repository: str
+    use_cases: List[dict]
+    results: Optional[dict] = None
+    error: Optional[str] = None
+
+
+class AnalysisDetail(BaseModel):
+    job_id: UUID
+    status: AnalysisStatus
+    repository: str
+    branch: str
+    include_folders: List[str]
+    use_cases: List[dict]
+    results: Optional[dict] = None
+    error: Optional[str] = None
+    created_at: str
+    updated_at: str
+    project_id: Optional[str] = None
+
+class RepositoryRequest(BaseModel):
+    url: HttpUrl
+    branch: str = "main"
+    include_folders: List[str] = ["docs"]
+    project_id: Optional[str] = None
+
+
+class AnalysisResponse(BaseModel):
+    job_id: UUID
+    status: AnalysisStatus
+    message: str
