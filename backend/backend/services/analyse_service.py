@@ -22,6 +22,8 @@ class AnalysisService:
         url: str,
         branch: str,
         include_folders: List[str],
+        user_id: str,
+        project_id: Optional[str] = None,
     ) -> UUID:
         """Submit a repository for analysis."""
         job_id = uuid4()
@@ -49,6 +51,8 @@ class AnalysisService:
                 "branch": branch,
                 "include_folders": include_folders,
                 "job_id": str(job_id),
+                "user_id": user_id,
+                "project_id": project_id,
             },
             "use_cases": {},
             "created_at": job.created_at.isoformat(),
@@ -60,6 +64,14 @@ class AnalysisService:
             raise RuntimeError("Failed to store job")
         else:
             logger.info(f"Successfully stored job {job_id} in Redis")
+
+        # Link job to user and project
+        from backend.backend.services.auth_service import auth_service
+        auth_service.link_job_to_user(user_id, str(job_id))
+        
+        if project_id:
+            from backend.services.project_service import project_service
+            project_service.link_job_to_project(project_id, str(job_id))
 
         # Queue the orchestrated analysis task
         task = celery_app.send_task(
@@ -145,6 +157,25 @@ class AnalysisService:
                 jobs.append(job)
             except ValueError:
                 logger.warning(f"Invalid job ID in Redis: {job_id_str}")
+                continue
+        
+        return jobs
+
+    async def list_user_jobs(self, user_id: str, skip: int = 0, limit: int = 100) -> List[AnalysisJob]:
+        """List analysis jobs for a specific user."""
+        from backend.backend.services.auth_service import auth_service
+        
+        # Get user's job IDs
+        job_ids = auth_service.get_user_jobs(user_id)
+        
+        jobs = []
+        for job_id_str in job_ids[skip : skip + limit]:
+            try:
+                job_id = UUID(job_id_str)
+                job = await self.get_job_status(job_id)
+                jobs.append(job)
+            except ValueError:
+                logger.warning(f"Invalid job ID for user {user_id}: {job_id_str}")
                 continue
         
         return jobs

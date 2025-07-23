@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict
-from backend.common.auth import get_current_user, get_current_user_id, auth_service
+from backend.services.auth_service import get_current_user, get_current_user_id, auth_service
 from backend.models.user import User, UserCreate, AuthRequest, UserResponse
 import logging
 
@@ -13,7 +13,6 @@ async def sync_user(user_data: UserCreate, current_user_id: str = Depends(get_cu
     """
     Sync Auth0 user with backend. This endpoint creates or updates user data.
     """
-    logger.info(f"Syncing user: {user_data}")
     # Verify the token's user ID matches the provided user data
     if current_user_id != user_data.auth0_id:
         raise HTTPException(

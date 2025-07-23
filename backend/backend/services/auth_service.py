@@ -68,7 +68,6 @@ class AuthService:
         
     def verify_token(self, credentials: HTTPAuthorizationCredentials) -> Dict:
         """Verify Auth0 JWT token with proper signature verification"""
-        logger.info(f"Verifying token: {credentials}")
         if not credentials:
             raise HTTPException(status_code=401, detail="No authorization header")
             
@@ -93,7 +92,6 @@ class AuthService:
                 audience=self.auth0_audience,
                 issuer=f"https://{self.auth0_domain}/"
             )
-            logger.info(f"Token payload: {payload}")
             # Ensure we have the required fields
             if not payload.get('sub'):
                 raise HTTPException(status_code=401, detail="Invalid token: missing sub")
@@ -110,9 +108,7 @@ class AuthService:
             
             name = payload.get('name') or payload.get('nickname') or (email.split('@')[0] if email else payload['sub'])
             picture = payload.get('picture') or ''
-            
-            logger.info(f"Successfully verified token for user: sub={payload['sub']}, email={email}")
-            
+                        
             return {
                 'sub': payload['sub'],
                 'email': email,
