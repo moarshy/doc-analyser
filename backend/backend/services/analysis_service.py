@@ -8,16 +8,10 @@ import logging
 from backend.models.analysis import AnalysisJob, AnalysisStatus
 from backend.common.redis_client import get_redis_client
 
-# Import celery components only when needed to avoid import errors
-try:
-    from celery.result import AsyncResult
-    from backend.worker.celery_app import celery_app
-    from backend.worker.logger import tasks_logger
-    CELERY_AVAILABLE = True
-except ImportError:
-    CELERY_AVAILABLE = False
-    celery_app = None
-    tasks_logger = None
+from celery.result import AsyncResult
+from backend.worker.celery_app import celery_app
+from backend.services.auth_service import auth_service
+from backend.services.project_service import project_service
 
 logger = logging.getLogger("backend.gateway.services")
 
@@ -41,7 +35,7 @@ class AnalysisService:
                 if isinstance(value, dict):
                     # Check if this has the expected structure with 'data' field
                     if "data" in value:
-                # Merge the top-level metadata with the data
+                        # Merge the top-level metadata with the data
                         use_case = {
                             **value["data"],  # Use case data (name, description, etc.)
                             "status": value.get("status"),  # Status from top level
@@ -83,53 +77,51 @@ class AnalysisService:
         """Submit a repository for analysis."""
         job_id = uuid4()
         
-        # Create job record
-        job = AnalysisJob(
-            id=job_id,
-            repository_url=url,
-            branch=branch,
-            include_folders=include_folders,
-            status=AnalysisStatus.PENDING,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        
-        # Store job in Redis using simplified structure
-        job_data = {
-            "status": "pending",
-            "total_use_cases": 0,
-            "completed": 0,
-            "failed": 0,
-            "pending": 0,
-            "job_params": {
-                "repository_url": url,
-                "branch": branch,
-                "include_folders": include_folders,
-                "job_id": str(job_id),
-                "user_id": user_id,
-                "project_id": project_id,
-            },
-            "use_cases": {},
-            "created_at": job.created_at.isoformat(),
-            "updated_at": job.updated_at.isoformat()
-        }
-        
-        if not self.redis.store_job(job_id, job_data):
-            logger.error(f"Failed to store job {job_id} in Redis")
-            raise RuntimeError("Failed to store job")
-        else:
-            logger.info(f"Successfully stored job {job_id} in Redis")
+        try:    
+            # Create job record
+            job = AnalysisJob(
+                id=job_id,
+                repository_url=url,
+                branch=branch,
+                include_folders=include_folders,
+                status=AnalysisStatus.PENDING,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            
+            # Store job in Redis using simplified structure
+            job_data = {
+                "status": "pending",
+                "total_use_cases": 0,
+                "completed": 0,
+                "failed": 0,
+                "pending": 0,
+                "job_params": {
+                    "repository_url": url,
+                    "branch": branch,
+                    "include_folders": include_folders,
+                    "job_id": str(job_id),
+                    "user_id": user_id,
+                    "project_id": project_id,
+                },
+                "use_cases": {},
+                "created_at": job.created_at.isoformat(),
+                "updated_at": job.updated_at.isoformat()
+            }
+            
+            if not self.redis.store_job(job_id, job_data):
+                logger.error(f"Failed to store job {job_id} in Redis")
+                raise RuntimeError("Failed to store job")
+            else:
+                logger.info(f"Successfully stored job {job_id} in Redis")
 
-        # Link job to user and project
-        from backend.services.auth_service import auth_service
-        auth_service.link_job_to_user(user_id, str(job_id))
-        
-        if project_id:
-            from backend.services.project_service import project_service
-            project_service.link_job_to_project(project_id, str(job_id))
+            # Link job to user and project
+            auth_service.link_job_to_user(user_id, str(job_id))
+            
+            if project_id:
+                project_service.link_job_to_project(project_id, str(job_id))
 
-        # Queue the orchestrated analysis task (if celery is available)
-        if CELERY_AVAILABLE and celery_app:
+            # Queue the orchestrated analysis task (if celery is available)
             task = celery_app.send_task(
                 "orchestrate_analysis",
                 args=[
@@ -140,11 +132,10 @@ class AnalysisService:
                 ],
                 task_id=str(job_id)  # Use job_id as task_id for consistency
             )
-            logger.info(f"Analysis task queued: {task.id}")
-        else:
-            logger.warning("Celery not available - analysis task not queued")
-        
-        return job_id
+            return job_id
+        except Exception as e:
+            logger.error(f"Error submitting analysis: {e}")
+            raise e
 
     async def get_job_status(self, job_id: UUID) -> AnalysisJob:
         """Get the current status of an analysis job."""
@@ -161,15 +152,14 @@ class AnalysisService:
             branch=job_params.get("branch", "main"),
             include_folders=job_params.get("include_folders", ["docs"]),
             status=AnalysisStatus(job_data.get("status", "pending")),
-            created_at=datetime.fromisoformat(job_data.get("created_at", datetime.utcnow().isoformat())),
-            updated_at=datetime.fromisoformat(job_data.get("updated_at", datetime.utcnow().isoformat())),
+            created_at=datetime.fromisoformat(job_data.get("created_at", datetime.now(timezone.utc).isoformat())),
+            updated_at=datetime.fromisoformat(job_data.get("updated_at", datetime.now(timezone.utc).isoformat())),
             results=job_data.get("results"),
             error=job_data.get("error"),
             use_cases=self._extract_use_cases(job_data.get("use_cases", {}))
         )
         
-        # Check Celery task status for updates (if celery is available)
-        if CELERY_AVAILABLE and celery_app and job.status in [AnalysisStatus.PENDING, AnalysisStatus.PROCESSING]:
+        if job.status in [AnalysisStatus.PENDING, AnalysisStatus.PROCESSING]:
             task_id = str(job_id)
             task = AsyncResult(task_id, app=celery_app)
             
@@ -199,7 +189,7 @@ class AnalysisService:
                     })
                     self.redis.store_job(job_id, job_data)
                 
-                job.updated_at = datetime.utcnow()
+                job.updated_at = datetime.now(timezone.utc)
 
         return job
 
@@ -222,7 +212,6 @@ class AnalysisService:
 
     async def list_user_jobs(self, user_id: str) -> List[AnalysisJob]:
         """List analysis jobs for a specific user."""
-        from backend.services.auth_service import auth_service
         
         # Get user's job IDs
         job_ids = auth_service.get_user_jobs(user_id)

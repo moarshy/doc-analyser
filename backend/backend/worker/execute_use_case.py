@@ -89,7 +89,8 @@ async def execute_use_case(prompt: str, cwd: str):
             "LS", "MultiEdit",
             "Glob", "Grep", "Task",  
             "Bash", "NotebookRead",
-            "TodoWrite", "exit_plan_mode"
+            "TodoWrite", "exit_plan_mode",
+            "Task"
         ]
     )
 

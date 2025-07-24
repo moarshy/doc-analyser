@@ -1,24 +1,18 @@
 import uuid
 import json
 import logging
-import redis
-import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from fastapi import HTTPException
 from backend.models.project import Project, ProjectCreate, ProjectUpdate, ProjectStatus
+from backend.common.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
 class ProjectService:
     def __init__(self):
-        # Use direct Redis client for project operations
-        self.redis = redis.Redis(
-            host=os.getenv('REDIS_HOST', 'localhost'),
-            port=int(os.getenv('REDIS_PORT', 6379)),
-            db=0,
-            decode_responses=True
-        )
+        # Use unified Redis client for project operations
+        self.redis = get_redis_client()
 
     def create_project(self, user_id: str, project_data: ProjectCreate) -> Project:
         """Create a new project for a user"""
@@ -39,46 +33,24 @@ class ProjectService:
             last_analysis_at=None
         )
         
-        # Store project in Redis
-        project_key = f"project:{project_id}"
+        # Store project in Redis using JSON format
         project_data_for_redis = project.model_dump()
         
-        # Handle None values and serialize complex types
-        for key, value in project_data_for_redis.items():
-            if value is None:
-                project_data_for_redis[key] = ""  # Convert None to empty string
-            elif key == 'settings':
-                project_data_for_redis[key] = json.dumps(value)
-            elif key == 'status':
-                # Handle enum - extract the actual string value
-                if hasattr(value, 'value'):
-                    project_data_for_redis[key] = value.value
-                elif isinstance(value, str) and value.startswith('ProjectStatus.'):
-                    # Handle case where it's already converted to string representation
-                    project_data_for_redis[key] = value.split('.')[-1]
-                else:
-                    project_data_for_redis[key] = str(value)
-            else:
-                project_data_for_redis[key] = str(value)
+        # Handle enum serialization
+        if hasattr(project_data_for_redis['status'], 'value'):
+            project_data_for_redis['status'] = project_data_for_redis['status'].value
         
-        self.redis.hset(project_key, mapping=project_data_for_redis)
+        self.redis.store_project(project_id, project_data_for_redis)
         
         # Add to user's project list
-        user_projects_key = f"user_projects:{user_id}"
-        timestamp = datetime.now(timezone.utc).timestamp()
-        self.redis.zadd(user_projects_key, {project_id: timestamp})
-        
-        # Set TTL (30 days)
-        self.redis.expire(project_key, 30 * 24 * 60 * 60)
-        self.redis.expire(user_projects_key, 30 * 24 * 60 * 60)
+        self.redis.add_user_project(user_id, project_id)
         
         logger.info(f"Created project {project_id} for user {user_id}")
         return project
 
     def get_project(self, project_id: str, user_id: str) -> Optional[Project]:
         """Get a project by ID if user owns it"""
-        project_key = f"project:{project_id}"
-        project_data = self.redis.hgetall(project_key)
+        project_data = self.redis.get_project(project_id)
         
         if not project_data:
             return None
@@ -87,24 +59,12 @@ class ProjectService:
         if project_data.get('user_id') != user_id:
             raise HTTPException(status_code=403, detail="Access denied to this project")
         
-        # Convert Redis data back to Project model
-        # Handle empty strings as None for optional fields
-        for key, value in project_data.items():
-            if value == "":
-                if key in ['description', 'repository_url', 'last_analysis_at']:
-                    project_data[key] = None
-            elif key == 'status' and isinstance(value, str) and value.startswith('ProjectStatus.'):
-                # Fix any existing bad enum data
-                project_data[key] = value.split('.')[-1]
-        
-        # Deserialize JSON fields
-        if project_data.get('settings'):
-            project_data['settings'] = json.loads(project_data['settings'])
-        else:
-            project_data['settings'] = {}
-            
         # Convert numeric fields
         project_data['job_count'] = int(project_data.get('job_count', 0))
+        
+        # Ensure settings is a dict
+        if not isinstance(project_data.get('settings'), dict):
+            project_data['settings'] = {}
         
         return Project(**project_data)
 
@@ -117,29 +77,17 @@ class ProjectService:
         # Update fields
         update_dict = update_data.model_dump(exclude_unset=True)
         
-        # Handle None values and serialize complex types
-        for key, value in list(update_dict.items()):
-            if value is None:
-                update_dict[key] = ""  # Convert None to empty string
-            elif key == 'settings':
-                update_dict[key] = json.dumps(value)
-            elif key == 'status':
-                # Handle enum - extract the actual string value
-                if hasattr(value, 'value'):
-                    update_dict[key] = value.value
-                elif isinstance(value, str) and value.startswith('ProjectStatus.'):
-                    # Handle case where it's already converted to string representation
-                    update_dict[key] = value.split('.')[-1]
-                else:
-                    update_dict[key] = str(value)
-            else:
-                update_dict[key] = str(value)
+        # Handle enum serialization
+        if 'status' in update_dict and hasattr(update_dict['status'], 'value'):
+            update_dict['status'] = update_dict['status'].value
         
         update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
         
-        # Update in Redis
-        project_key = f"project:{project_id}"
-        self.redis.hset(project_key, mapping=update_dict)
+        # Get current project data and update it
+        current_data = self.redis.get_project(project_id)
+        if current_data:
+            current_data.update(update_dict)
+            self.redis.store_project(project_id, current_data)
         
         # Get updated project
         return self.get_project(project_id, user_id)
@@ -151,28 +99,15 @@ class ProjectService:
             return False
         
         # Soft delete by updating status
-        project_key = f"project:{project_id}"
-        self.redis.hset(project_key, mapping={
-            'status': ProjectStatus.deleted.value,
-            'updated_at': datetime.now(timezone.utc).isoformat()
-        })
-        
-        # Remove from user's active projects list
-        user_projects_key = f"user_projects:{user_id}"
-        self.redis.zrem(user_projects_key, project_id)
+        self.redis.update_project_field(project_id, 'status', ProjectStatus.deleted.value)
         
         logger.info(f"Deleted project {project_id} for user {user_id}")
         return True
 
     def list_user_projects(self, user_id: str) -> tuple[List[Project], int]:
         """List all projects for a user"""
-        user_projects_key = f"user_projects:{user_id}"
-        
-        # Get total count
-        total = self.redis.zcard(user_projects_key)
-        
         # Get all project IDs (sorted by creation time, newest first)
-        project_ids = self.redis.zrevrange(user_projects_key, 0, -1)
+        project_ids = self.redis.get_user_projects_list(user_id)
         
         # Get project details
         projects = []
@@ -181,13 +116,15 @@ class ProjectService:
             if project and project.status != ProjectStatus.deleted:
                 projects.append(project)
         
-        return projects, total
+        return projects, len(projects)
 
     def increment_job_count(self, project_id: str):
         """Increment job count for a project"""
-        project_key = f"project:{project_id}"
-        self.redis.hincrby(project_key, 'job_count', 1)
-        self.redis.hset(project_key, 'last_analysis_at', datetime.now(timezone.utc).isoformat())
+        project_data = self.redis.get_project(project_id)
+        if project_data:
+            project_data['job_count'] = int(project_data.get('job_count', 0)) + 1
+            project_data['last_analysis_at'] = datetime.now(timezone.utc).isoformat()
+            self.redis.store_project(project_id, project_data)
 
     def get_project_jobs(self, project_id: str, user_id: str) -> List[str]:
         """Get all job IDs for a project"""
@@ -197,16 +134,13 @@ class ProjectService:
             if not project:
                 raise HTTPException(status_code=404, detail="Project not found")
             
-            project_jobs_key = f"project_jobs:{project_id}"
-            return self.redis.zrange(project_jobs_key, 0, -1)
+            return self.redis.get_project_jobs_list(project_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail="Failed to get project jobs")
 
     def link_job_to_project(self, project_id: str, job_id: str):
         """Link a job to a project"""
-        project_jobs_key = f"project_jobs:{project_id}"
-        timestamp = datetime.now(timezone.utc).timestamp()
-        self.redis.zadd(project_jobs_key, {job_id: timestamp})
+        self.redis.add_project_job(project_id, job_id)
         
         # Update project job count and last analysis time
         self.increment_job_count(project_id)

@@ -1,6 +1,5 @@
 import os
 import jwt
-import redis
 import logging
 import requests
 from datetime import datetime, timezone
@@ -9,6 +8,7 @@ from fastapi import HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.algorithms import RSAAlgorithm
 from backend.common.config import settings
+from backend.common.redis_client import get_redis_client
 
 # logging.basicConfig(level=logging.INFO)  # Let the main app configure logging
 logger = logging.getLogger(__name__)
@@ -17,12 +17,7 @@ security = HTTPBearer()
 
 class AuthService:
     def __init__(self):
-        self.redis_client = redis.Redis(
-            host=os.getenv('REDIS_HOST', 'localhost'),
-            port=int(os.getenv('REDIS_PORT', 6379)),
-            db=0,
-            decode_responses=True
-        )
+        self.redis_client = get_redis_client()
         self.auth0_domain = settings.AUTH0_DOMAIN
         self.auth0_audience = settings.AUTH0_AUDIENCE
         self._jwks_cache = None
@@ -134,21 +129,20 @@ class AuthService:
         name = user_info.get('name', '')
         picture = user_info.get('picture', '')
         
-        user_key = f"user:{user_id}"
-        
         # Check if user exists
-        existing_user = self.redis_client.hgetall(user_key)
+        existing_user = self.redis_client.get_user(user_id)
         
         if existing_user:
             # Update last login
-            self.redis_client.hset(user_key, "last_login", datetime.now(timezone.utc).isoformat())
+            existing_user["last_login"] = datetime.now(timezone.utc).isoformat()
+            self.redis_client.store_user(user_id, existing_user)
             return {
                 "id": user_id,
                 "email": email,
                 "name": name,
                 "picture": picture,
                 "created_at": existing_user.get("created_at"),
-                "last_login": datetime.now(timezone.utc).isoformat(),
+                "last_login": existing_user["last_login"],
                 "total_jobs": int(existing_user.get("total_jobs", 0))
             }
         else:
@@ -165,24 +159,25 @@ class AuthService:
             }
             
             # Store user data
-            self.redis_client.hset(user_key, mapping=user_data)
+            self.redis_client.store_user(user_id, user_data)
             
             return user_data
     
     def increment_user_job_count(self, user_id: str):
         """Increment user's job count"""
-        user_key = f"user:{user_id}"
-        self.redis_client.hincrby(user_key, "total_jobs", 1)
+        user_data = self.redis_client.get_user(user_id)
+        if user_data:
+            user_data["total_jobs"] = int(user_data.get("total_jobs", 0)) + 1
+            self.redis_client.store_user(user_id, user_data)
     
     def get_user_jobs(self, user_id: str) -> list:
         """Get all job IDs for a user"""
-        jobs_key = f"user_jobs:{user_id}"
-        return self.redis_client.lrange(jobs_key, 0, -1)
+        return self.redis_client.get_user_jobs_list(user_id)
     
     def link_job_to_user(self, user_id: str, job_id: str):
         """Link a job to a user"""
-        jobs_key = f"user_jobs:{user_id}"
-        self.redis_client.lpush(jobs_key, job_id)
+        self.redis_client.add_user_job(user_id, job_id)
+        self.increment_user_job_count(user_id)
 
 # Global auth service instance
 auth_service = AuthService()
@@ -198,8 +193,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     user_id = user_info['sub']
     
     # Get user from Redis (must exist after sync-user call)
-    user_key = f"user:{user_id}"
-    user_data = auth_service.redis_client.hgetall(user_key)
+    user_data = auth_service.redis_client.get_user(user_id)
     
     if not user_data:
         raise HTTPException(

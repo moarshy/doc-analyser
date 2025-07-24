@@ -82,7 +82,8 @@ def extract_use_cases(repo_path: str, output_path: str):
             "Read", "Write", "Edit", "LS", "MultiEdit",
             "Glob", "Grep", "Task",
             "Bash", "NotebookRead",
-            "TodoWrite", "exit_plan_mode"
+            "TodoWrite", "exit_plan_mode",
+            "Task"
         ]
     )
     

@@ -105,6 +105,34 @@ export default function ProjectDetailsPage() {
     router.push(`/dashboard/projects/${projectId}/edit`);
   };
 
+  const handleStartAnalysis = async () => {
+    if (!apiClient || !project) return;
+    
+    if (!project.repository_url) {
+      alert('Please set a repository URL in the project settings before starting analysis.');
+      return;
+    }
+    
+    setIsLoadingAnalyses(true);
+    try {
+      const response = await apiClient.startAnalysis({
+        url: project.repository_url,
+        branch: "main",
+        include_folders: ["docs"],
+        project_id: projectId,
+      });
+      
+      // Redirect to the analysis progress page
+      router.push(`/dashboard/analyses/${response.data.job_id}`);
+    } catch (error: any) {
+      console.error('Failed to start analysis:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to start analysis. Please check the repository URL and try again.';
+      alert(errorMessage);
+    } finally {
+      setIsLoadingAnalyses(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -165,9 +193,13 @@ export default function ProjectDetailsPage() {
               Edit Project
             </Button>
             {analyses.length === 0 && (
-              <Button className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
+              <Button 
+                onClick={handleStartAnalysis}
+                disabled={isLoadingAnalyses || !project.repository_url}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Play className="h-4 w-4" />
-                Start Analysis
+                {isLoadingAnalyses ? 'Starting...' : 'Start Analysis'}
               </Button>
             )}
           </div>
@@ -259,13 +291,34 @@ export default function ProjectDetailsPage() {
           <CardContent>
             <div className="space-y-4">
               <div className="p-4 border border-dashed rounded-lg text-center opacity-70">
-                <p className="mb-4 opacity-80">
-                  Ready to analyze documentation for this project?
-                </p>
-                <Button className="bg-green-600 hover:bg-green-700 text-white">
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Analysis
-                </Button>
+                {project.repository_url ? (
+                  <>
+                    <p className="mb-4 opacity-80">
+                      Ready to analyze documentation for this project?
+                    </p>
+                    <Button 
+                      onClick={handleStartAnalysis}
+                      disabled={isLoadingAnalyses}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      {isLoadingAnalyses ? 'Starting...' : 'Start Analysis'}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="mb-4 opacity-80">
+                      Please set a repository URL in your project settings to start analysis.
+                    </p>
+                    <Button 
+                      onClick={handleEdit}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Edit Project Settings
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
