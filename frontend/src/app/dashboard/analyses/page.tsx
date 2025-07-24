@@ -93,7 +93,7 @@ export default function AnalysesListPage() {
         // Load user's analyses if authenticated
         if (isAuthenticated && apiClient) {
           try {
-            const response = await apiClient.client.get('/analysis/jobs');
+            const response = await apiClient.getAnalyses();
             setAnalyses(response.data || []);
           } catch (err) {
             console.error('Failed to load user analyses:', err);
