@@ -34,13 +34,24 @@ class AnalysisService:
         if not use_cases_data:
             return []
         
+        
         if isinstance(use_cases_data, dict):
             extracted_use_cases = []
             for key, value in use_cases_data.items():
                 if isinstance(value, dict):
                     # Check if this has the expected structure with 'data' field
                     if "data" in value:
-                        extracted_use_cases.append(value["data"])
+                # Merge the top-level metadata with the data
+                        use_case = {
+                            **value["data"],  # Use case data (name, description, etc.)
+                            "status": value.get("status"),  # Status from top level
+                            "execution_time_seconds": value.get("execution_time_seconds"),
+                            "container_logs": value.get("container_logs"),
+                            "start_time": value.get("start_time"),
+                            "end_time": value.get("end_time"),
+                        }
+                        
+                        extracted_use_cases.append(use_case)
                     elif "name" in value:
                         # Direct use case data
                         extracted_use_cases.append(value)
@@ -50,6 +61,7 @@ class AnalysisService:
                 else:
                     # Non-dict value, add as-is
                     extracted_use_cases.append(value)
+
             return extracted_use_cases
         
         elif isinstance(use_cases_data, list):

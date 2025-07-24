@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # Server settings
     APP_HOST: str = "0.0.0.0"
     PORT: int = 8000
-    DEBUG: bool = False
+    DEBUG: bool = True
 
     # CORS settings
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]

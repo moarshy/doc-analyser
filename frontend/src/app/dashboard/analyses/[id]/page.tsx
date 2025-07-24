@@ -74,13 +74,13 @@ const getStatusIcon = (status: string) => {
 const getDifficultyColor = (level: string) => {
   switch (level?.toLowerCase()) {
     case 'beginner':
-      return 'bg-green-100 text-green-800';
+      return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
     case 'intermediate':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
     case 'advanced':
-      return 'bg-red-100 text-red-800';
+      return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
   }
 };
 
@@ -103,6 +103,18 @@ export default function AnalysisDetailPage() {
 
       try {
         const response = await apiClient.getAnalysisDetail(jobId);
+        console.log('🔍 Full Analysis Response:', response.data);
+        console.log('🔍 Use Cases Array:', response.data.use_cases);
+        
+        // Log each use case individually
+        response.data.use_cases?.forEach((useCase: any, index: number) => {
+          console.log(`🔍 Use Case ${index}:`, useCase);
+          console.log(`   - Name: ${useCase.name || useCase.data?.name}`);
+          console.log(`   - Status: ${useCase.status}`);
+          console.log(`   - Data:`, useCase.data);
+          console.log(`   - All keys:`, Object.keys(useCase));
+        });
+        
         setAnalysis(response.data);
       } catch (err: any) {
         if (err.response?.status === 404) {
@@ -263,15 +275,15 @@ export default function AnalysisDetailPage() {
                         <div className="flex items-center gap-2 mb-1">
                           {getStatusIcon(useCase.status || 'pending')}
                           <span className="text-sm font-medium truncate">
-                            {useCase.name || useCase.data?.name || `Use Case ${index + 1}`}
+                            {useCase.name || `Use Case ${index + 1}`}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
-                          {useCase.data?.description || useCase.description || 'No description'}
+                          {useCase.description || 'No description'}
                         </p>
-                        {useCase.data?.difficulty_level && (
-                          <Badge className={`text-xs mt-1 ${getDifficultyColor(useCase.data.difficulty_level)}`}>
-                            {useCase.data.difficulty_level}
+                        {useCase.difficulty_level && (
+                          <Badge className={`text-xs mt-1 ${getDifficultyColor(useCase.difficulty_level)}`}>
+                            {useCase.difficulty_level}
                           </Badge>
                         )}
                       </div>
@@ -290,11 +302,18 @@ export default function AnalysisDetailPage() {
             <Card className="dark:bg-slate-800 dark:border-slate-700">
               <CardHeader>
                 <CardTitle className="text-xl">
-                  {selectedUseCase.name || selectedUseCase.data?.name || `Use Case ${selectedUseCaseIndex + 1}`}
+                  {selectedUseCase.name || `Use Case ${selectedUseCaseIndex + 1}`}
                 </CardTitle>
                 <p className="text-slate-600 dark:text-slate-400">
-                  {selectedUseCase.data?.description || selectedUseCase.description || 'No description available'}
+                  {selectedUseCase.description || 'No description available'}
                 </p>
+                
+                {/* Difficulty Level */}
+                {(selectedUseCase.data?.difficulty_level || selectedUseCase.difficulty_level) && (
+                  <Badge className={`text-sm mt-2 ${getDifficultyColor(selectedUseCase.data?.difficulty_level || selectedUseCase.difficulty_level)}`}>
+                    {selectedUseCase.data?.difficulty_level || selectedUseCase.difficulty_level}
+                  </Badge>
+                )}
               </CardHeader>
               <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -312,14 +331,14 @@ export default function AnalysisDetailPage() {
                   <TabsContent value="details">
                     <div className="space-y-6">
                       {/* Success Criteria */}
-                      {selectedUseCase.data?.success_criteria && (
+                      {selectedUseCase.success_criteria && (
                         <Card className="dark:bg-slate-700 dark:border-slate-600">
                           <CardHeader>
                             <CardTitle className="text-lg">Success Criteria</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <ul className="list-disc list-inside space-y-2">
-                              {selectedUseCase.data.success_criteria.map((criteria: string, idx: number) => (
+                              {selectedUseCase.success_criteria.map((criteria: string, idx: number) => (
                                 <li key={idx} className="text-sm">{criteria}</li>
                               ))}
                             </ul>
@@ -328,17 +347,19 @@ export default function AnalysisDetailPage() {
                       )}
 
                       {/* Documentation Sources */}
-                      {selectedUseCase.data?.documentation_source && (
+                      {selectedUseCase.documentation_source && (
                         <Card className="dark:bg-slate-700 dark:border-slate-600">
                           <CardHeader>
                             <CardTitle className="text-lg">Documentation Sources</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <ul className="space-y-2">
-                              {selectedUseCase.data.documentation_source.map((source: string, idx: number) => (
+                              {selectedUseCase.documentation_source.map((source: string, idx: number) => (
                                 <li key={idx} className="flex items-center gap-2 text-sm">
                                   <FileText className="h-4 w-4 text-slate-400" />
-                                  <code className="bg-slate-100 dark:bg-slate-600 px-2 py-1 rounded text-xs">{source}</code>
+                                  <code className="bg-slate-100 dark:bg-slate-600 px-2 py-1 rounded text-xs">
+                                    {source.replace('/workspace/repo/', '')}
+                                  </code>
                                 </li>
                               ))}
                             </ul>
@@ -476,3 +497,4 @@ export default function AnalysisDetailPage() {
     </div>
   );
 }
+
