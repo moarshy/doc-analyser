@@ -212,31 +212,30 @@ export default function AnalysisDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-lg shadow-sm border dark:border-slate-700 p-6 mb-6 bg-white dark:bg-slate-800">
-        <div className="flex items-center justify-between mb-4">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-        </div>
-        
-        <div className="flex items-center gap-3 mb-4">
-          <Globe className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <div>
-            <h1 className="text-2xl font-bold">{analysis.repository}</h1>
-            <p className="text-slate-600 dark:text-slate-400">{analysis.branch} branch</p>
+      <div className="rounded-lg shadow-sm border dark:border-slate-700 p-4 mb-6 bg-white dark:bg-slate-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Globe className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div>
+              <h1 className="text-xl font-bold">{analysis.repository}</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{analysis.branch} branch</p>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {getStatusIcon(analysis.status)}
-          <Badge variant={analysis.status === 'completed' ? 'default' : 'secondary'}>
-            {analysis.status}
-          </Badge>
+          
+          <div className="flex items-center gap-2">
+            {getStatusIcon(analysis.status)}
+            <Badge variant={analysis.status === 'completed' ? 'default' : 'secondary'}>
+              {analysis.status}
+            </Badge>
+          </div>
         </div>
       </div>
 
@@ -248,7 +247,7 @@ export default function AnalysisDetailPage() {
               <CardTitle className="text-lg">Use Cases ({analysis.use_cases?.length || 0})</CardTitle>
             </CardHeader>
             <CardContent className="p-3">
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-[800px] overflow-y-auto">
                 {analysis.use_cases?.filter(useCase => useCase != null).map((useCase, index) => (
                   <button
                     key={index}
@@ -312,164 +311,167 @@ export default function AnalysisDetailPage() {
 
                   <TabsContent value="details">
                     <div className="space-y-6">
-                    {/* Success Criteria */}
-                    {selectedUseCase.data?.success_criteria && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Success Criteria</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="list-disc list-inside space-y-2">
-                            {selectedUseCase.data.success_criteria.map((criteria: string, idx: number) => (
-                              <li key={idx} className="text-sm">{criteria}</li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
+                      {/* Success Criteria */}
+                      {selectedUseCase.data?.success_criteria && (
+                        <Card className="dark:bg-slate-700 dark:border-slate-600">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Success Criteria</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="list-disc list-inside space-y-2">
+                              {selectedUseCase.data.success_criteria.map((criteria: string, idx: number) => (
+                                <li key={idx} className="text-sm">{criteria}</li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                    {/* Documentation Sources */}
-                    {selectedUseCase.data?.documentation_source && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Documentation Sources</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {selectedUseCase.data.documentation_source.map((source: string, idx: number) => (
-                              <li key={idx} className="flex items-center gap-2 text-sm">
-                                <FileText className="h-4 w-4 text-slate-400" />
-                                <code className="bg-slate-100 px-2 py-1 rounded text-xs">{source}</code>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
+                      {/* Documentation Sources */}
+                      {selectedUseCase.data?.documentation_source && (
+                        <Card className="dark:bg-slate-700 dark:border-slate-600">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Documentation Sources</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="space-y-2">
+                              {selectedUseCase.data.documentation_source.map((source: string, idx: number) => (
+                                <li key={idx} className="flex items-center gap-2 text-sm">
+                                  <FileText className="h-4 w-4 text-slate-400" />
+                                  <code className="bg-slate-100 dark:bg-slate-600 px-2 py-1 rounded text-xs">{source}</code>
+                                </li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                    {/* Execution Info */}
-                    {selectedUseCase.execution_time_seconds && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Execution Information</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">Execution Time</p>
-                              <p className="text-lg font-semibold">{selectedUseCase.execution_time_seconds.toFixed(2)}s</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">Status</p>
-                              <div className="flex items-center gap-2">
-                                {getStatusIcon(selectedUseCase.status || 'pending')}
-                                <span className="font-medium">{selectedUseCase.status || 'Pending'}</span>
+                      {/* Execution Info */}
+                      {selectedUseCase.execution_time_seconds && (
+                        <Card className="dark:bg-slate-700 dark:border-slate-600">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Execution Information</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Execution Time</p>
+                                <p className="text-lg font-semibold">{selectedUseCase.execution_time_seconds.toFixed(2)}s</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</p>
+                                <div className="flex items-center gap-2">
+                                  {getStatusIcon(selectedUseCase.status || 'pending')}
+                                  <span className="font-medium">{selectedUseCase.status || 'Pending'}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </TabsContent>
 
-                <TabsContent value="results" className="h-full p-4 m-0">
-                  <div className="space-y-6 h-full overflow-y-auto">
-                    {/* Generated Code */}
-                    {selectedFiles?.code && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <FileCode className="h-5 w-5" />
-                            Generated Code
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm">
-                            <code>{selectedFiles.code}</code>
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    )}
+                  <TabsContent value="results">
+                    <div className="space-y-6">
+                      {/* Generated Code */}
+                      {selectedFiles?.code && (
+                        <Card className="dark:bg-slate-700 dark:border-slate-600">
+                          <CardHeader>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <FileCode className="h-5 w-5" />
+                              Generated Code
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm">
+                              <code>{selectedFiles.code}</code>
+                            </pre>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                    {/* Execution Results */}
-                    {selectedFiles?.results && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <Play className="h-5 w-5" />
-                            Execution Results
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div>
-                            <p className="font-medium text-sm mb-2">Status:</p>
-                            <Badge className={selectedFiles.results.execution_status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                              {selectedFiles.results.execution_status}
-                            </Badge>
-                          </div>
-                          
-                          <div>
-                            <p className="font-medium text-sm mb-2">Results:</p>
-                            <div className="bg-slate-50 p-3 rounded border text-sm whitespace-pre-wrap">
-                              {selectedFiles.results.execution_results}
-                            </div>
-                          </div>
-
-                          {selectedFiles.results.documentation_usefulness && (
+                      {/* Execution Results */}
+                      {selectedFiles?.results && (
+                        <Card className="dark:bg-slate-700 dark:border-slate-600">
+                          <CardHeader>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <Play className="h-5 w-5" />
+                              Execution Results
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
                             <div>
-                              <p className="font-medium text-sm mb-2">Documentation Usefulness:</p>
-                              <ul className="list-disc list-inside space-y-1 text-sm">
-                                {selectedFiles.results.documentation_usefulness.map((item: string, idx: number) => (
-                                  <li key={idx}>{item}</li>
-                                ))}
-                              </ul>
+                              <p className="font-medium text-sm mb-2">Status:</p>
+                              <Badge className={selectedFiles.results.execution_status === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}>
+                                {selectedFiles.results.execution_status}
+                              </Badge>
                             </div>
-                          )}
-
-                          {selectedFiles.results.documentation_weaknesses && (
+                            
                             <div>
-                              <p className="font-medium text-sm mb-2">Documentation Weaknesses:</p>
-                              <ul className="list-disc list-inside space-y-1 text-sm">
-                                {selectedFiles.results.documentation_weaknesses.map((item: string, idx: number) => (
-                                  <li key={idx}>{item}</li>
-                                ))}
-                              </ul>
+                              <p className="font-medium text-sm mb-2">Results:</p>
+                              <div className="bg-slate-50 dark:bg-slate-600 p-3 rounded border text-sm whitespace-pre-wrap">
+                                {selectedFiles.results.execution_results}
+                              </div>
                             </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
 
-                    {/* Container Logs */}
-                    {selectedUseCase.container_logs && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <Container className="h-5 w-5" />
-                            Container Logs
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-96 overflow-y-auto">
-                            <code>{selectedUseCase.container_logs}</code>
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
-              </div>
-            </Tabs>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-500">
-            <div className="text-center">
-              <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No use cases found</p>
-            </div>
-          </div>
-        )}
+                            {selectedFiles.results.documentation_usefulness && (
+                              <div>
+                                <p className="font-medium text-sm mb-2">Documentation Usefulness:</p>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                  {selectedFiles.results.documentation_usefulness.map((item: string, idx: number) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {selectedFiles.results.documentation_weaknesses && (
+                              <div>
+                                <p className="font-medium text-sm mb-2">Documentation Weaknesses:</p>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                  {selectedFiles.results.documentation_weaknesses.map((item: string, idx: number) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Container Logs */}
+                      {selectedUseCase.container_logs && (
+                        <Card className="dark:bg-slate-700 dark:border-slate-600">
+                          <CardHeader>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <Container className="h-5 w-5" />
+                              Container Logs
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs max-h-96 overflow-y-auto">
+                              <code>{selectedUseCase.container_logs}</code>
+                            </pre>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="dark:bg-slate-800 dark:border-slate-700">
+              <CardContent className="flex items-center justify-center py-12 text-slate-500 dark:text-slate-400">
+                <div className="text-center">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No use cases found</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
