@@ -359,7 +359,8 @@ export default function AnalysisDetailPage() {
             
             {/* Progress Stats */}
             {analysis.use_cases && analysis.use_cases.length > 0 && (
-              <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+              <div className="flex flex-col gap-2 text-sm">
+              <div className="flex items-center gap-4 text-slate-600 dark:text-slate-400">
                 <div className="flex items-center gap-1">
                   <CheckCircle className="h-4 w-4 text-green-500" />
                   <span>{analysis.use_cases.filter(uc => uc.status === 'completed').length} completed</span>
@@ -375,6 +376,39 @@ export default function AnalysisDetailPage() {
                 <span className="text-slate-400">•</span>
                 <span>{analysis.use_cases.length} total use cases</span>
               </div>
+              <div className="mt-2">
+                {analysis.status === 'cloning' && (
+                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Cloning repository from GitHub...</span>
+                  </div>
+                )}
+                {analysis.status === 'extracting' && (
+                  <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Extracting use cases from documentation...</span>
+                  </div>
+                )}
+                {analysis.status === 'executing' && (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Executing {analysis.use_cases?.length || 0} use cases...</span>
+                  </div>
+                )}
+                {analysis.status === 'completed' && (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>All use cases executed successfully</span>
+                  </div>
+                )}
+                {analysis.status === 'failed' && (
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Analysis failed - check error details</span>
+                  </div>
+                )}
+              </div>
+            </div>
             )}
           </div>
         </div>
