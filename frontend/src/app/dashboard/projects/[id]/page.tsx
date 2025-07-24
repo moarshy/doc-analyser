@@ -345,14 +345,29 @@ export default function ProjectDetailsPage() {
               
               {/* Start Button */}
               <div className="flex justify-center">
-                <Button 
-                  onClick={handleStartAnalysis}
-                  disabled={isLoadingAnalyses || !branch.trim() || !includeFolders.trim()}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  {isLoadingAnalyses ? 'Starting Analysis...' : 'Start Analysis'}
-                </Button>
+                {(() => {
+                  const hasActiveAnalysis = analyses.length > 0;
+                  const isDisabled = isLoadingAnalyses || !branch.trim() || !includeFolders.trim() || hasActiveAnalysis;
+                  
+                  return (
+                    <div className="text-center">
+                      <Button 
+                        onClick={handleStartAnalysis}
+                        disabled={isDisabled}
+                        className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Play className="mr-2 h-4 w-4" />
+                        {isLoadingAnalyses ? 'Starting Analysis...' : 
+                         hasActiveAnalysis ? 'Analysis Already Exists' : 'Start Analysis'}
+                      </Button>
+                      {hasActiveAnalysis && (
+                        <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+                          This project already has an analysis. Only one analysis per project is allowed.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -392,7 +407,11 @@ export default function ProjectDetailsPage() {
           ) : (
             <div className="space-y-4">
               {analyses.map((analysis) => (
-                <div key={analysis.job_id} className="border rounded-lg p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                <div 
+                  key={analysis.job_id} 
+                  className="border rounded-lg p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/dashboard/analyses/${analysis.job_id}`)}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {getStatusIcon(analysis.status)}
@@ -414,15 +433,6 @@ export default function ProjectDetailsPage() {
                         }
                       </p>
                     </div>
-                  </div>
-                  <div className="mt-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => router.push(`/dashboard/analyses/${analysis.job_id}`)}
-                    >
-                      View Details
-                    </Button>
                   </div>
                 </div>
               ))}

@@ -7,10 +7,8 @@ import {
   Home,
   Folder,
   FileText,
-  Settings,
   Menu,
   X,
-  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,8 +16,6 @@ const navigation = [
   { name: 'Overview', href: '/dashboard', icon: Home },
   { name: 'Projects', href: '/dashboard/projects', icon: Folder },
   { name: 'Analyses', href: '/dashboard/analyses', icon: FileText },
-  { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -45,9 +41,11 @@ export function Sidebar() {
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-slate-200 dark:border-slate-700">
           <Link href="/dashboard" className="flex items-center">
-            <div className="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">N</span>
-            </div>
+            <img 
+              src="/logo.svg" 
+              alt="Naptha Logo" 
+              className="h-8 w-8"
+            />
             <span className="ml-2 text-lg font-semibold text-slate-900 dark:text-white">
               Naptha
             </span>

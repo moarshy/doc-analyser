@@ -3,15 +3,13 @@
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, FolderOpen, Activity, BarChart3, Clock } from 'lucide-react';
+import { Plus, FolderOpen, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
 interface DashboardStats {
   totalProjects: number;
   completedAnalyses: number;
-  pendingJobs: number;
-  issuesFound: number;
 }
 
 export default function DashboardOverview() {
@@ -19,8 +17,6 @@ export default function DashboardOverview() {
   const [stats, setStats] = useState<DashboardStats>({
     totalProjects: 0,
     completedAnalyses: 0,
-    pendingJobs: 0,
-    issuesFound: 0
   });
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -36,12 +32,9 @@ export default function DashboardOverview() {
         const totalProjects = projects.length;
         const completedAnalyses = projects.reduce((sum: number, project: any) => sum + (project.job_count || 0), 0);
         
-        // For now, set pending jobs and issues to 0 since we don't have that data yet
         setStats({
           totalProjects,
           completedAnalyses,
-          pendingJobs: 0,
-          issuesFound: 0
         });
       } catch (error) {
         console.error('Failed to fetch dashboard stats:', error);
@@ -85,7 +78,7 @@ export default function DashboardOverview() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="border-blue-500 border-opacity-30">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -111,36 +104,6 @@ export default function DashboardOverview() {
               </div>
               <div className="p-3 bg-green-500 bg-opacity-20 rounded-full">
                 <Activity className="h-8 w-8 text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-yellow-500 border-opacity-30">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-yellow-400 mb-1">Pending Jobs</p>
-                <p className="text-3xl font-bold">{statsLoading ? '...' : stats.pendingJobs}</p>
-                <p className="text-xs opacity-70 mt-1">In queue</p>
-              </div>
-              <div className="p-3 bg-yellow-500 bg-opacity-20 rounded-full">
-                <Clock className="h-8 w-8 text-yellow-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-500 border-opacity-30">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-400 mb-1">Issues Found</p>
-                <p className="text-3xl font-bold">{statsLoading ? '...' : stats.issuesFound}</p>
-                <p className="text-xs opacity-70 mt-1">Documentation issues</p>
-              </div>
-              <div className="p-3 bg-purple-500 bg-opacity-20 rounded-full">
-                <BarChart3 className="h-8 w-8 text-purple-400" />
               </div>
             </div>
           </CardContent>
@@ -173,51 +136,52 @@ export default function DashboardOverview() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>How to Analyze Your Docs</CardTitle>
             <CardDescription>
-              Your latest project activities and analysis results
+              Follow these steps to get insights into your documentation quality
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 opacity-60">
-              <Activity className="h-12 w-12 opacity-40 mx-auto mb-4" />
-              <p>No recent activity</p>
-              <p className="text-sm">Start your first analysis to see activity here</p>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-sm font-semibold">
+                  1
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">Create a Project</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Set up a new project to organize your documentation analysis</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-sm font-semibold">
+                  2
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">Run Analysis</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Start the automated analysis process on your repository</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center text-sm font-semibold">
+                  3
+                </div>
+                <div>
+                  <h4 className="font-medium text-sm">What Happens During Analysis</h4>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1 mt-1">
+                    <p>• Clone the repo and set to your selected branch</p>
+                    <p>• Use coding agent to extract use cases from docs</p>
+                    <p>• Execute all different extracted use cases</p>
+                    <p>• Agent learns strengths and weak points of docs</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Navigation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link href="/dashboard/projects">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="p-6 text-center">
-              <FolderOpen className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Projects</h3>
-              <p className="opacity-70">Manage your documentation projects</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow opacity-50">
-          <CardContent className="p-6 text-center">
-            <Activity className="h-12 w-12 text-green-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Analyses</h3>
-            <p className="opacity-70">View analysis results and reports</p>
-            <p className="text-xs opacity-50 mt-2">Coming soon</p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow opacity-50">
-          <CardContent className="p-6 text-center">
-            <BarChart3 className="h-12 w-12 text-purple-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Reports</h3>
-            <p className="opacity-70">Export and share analysis reports</p>
-            <p className="text-xs opacity-50 mt-2">Coming soon</p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
