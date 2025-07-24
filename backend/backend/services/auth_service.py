@@ -8,8 +8,9 @@ from typing import Optional, Dict
 from fastapi import HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.algorithms import RSAAlgorithm
+from backend.gateway.config import settings
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)  # Let the main app configure logging
 logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
@@ -22,8 +23,8 @@ class AuthService:
             db=0,
             decode_responses=True
         )
-        self.auth0_domain = os.getenv('AUTH0_DOMAIN')
-        self.auth0_audience = os.getenv('AUTH0_AUDIENCE')
+        self.auth0_domain = settings.AUTH0_DOMAIN
+        self.auth0_audience = settings.AUTH0_AUDIENCE
         self._jwks_cache = None
         self._jwks_cache_time = None
         self._jwks_expiry = 3600  # Cache JWKS for 1 hour

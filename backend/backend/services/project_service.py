@@ -164,17 +164,15 @@ class ProjectService:
         logger.info(f"Deleted project {project_id} for user {user_id}")
         return True
 
-    def list_user_projects(self, user_id: str, page: int = 1, per_page: int = 20) -> tuple[List[Project], int]:
-        """List projects for a user with pagination"""
+    def list_user_projects(self, user_id: str) -> tuple[List[Project], int]:
+        """List all projects for a user"""
         user_projects_key = f"user_projects:{user_id}"
         
         # Get total count
         total = self.redis.zcard(user_projects_key)
         
-        # Get paginated project IDs (sorted by creation time, newest first)
-        start = (page - 1) * per_page
-        end = start + per_page - 1
-        project_ids = self.redis.zrevrange(user_projects_key, start, end)
+        # Get all project IDs (sorted by creation time, newest first)
+        project_ids = self.redis.zrevrange(user_projects_key, 0, -1)
         
         # Get project details
         projects = []
@@ -193,18 +191,22 @@ class ProjectService:
 
     def get_project_jobs(self, project_id: str, user_id: str) -> List[str]:
         """Get all job IDs for a project"""
-        # Verify project ownership first
-        project = self.get_project(project_id, user_id)
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-        
-        project_jobs_key = f"project_jobs:{project_id}"
-        return self.redis.lrange(project_jobs_key, 0, -1)
+        try:
+            # Verify project ownership first
+            project = self.get_project(project_id, user_id)
+            if not project:
+                raise HTTPException(status_code=404, detail="Project not found")
+            
+            project_jobs_key = f"project_jobs:{project_id}"
+            return self.redis.zrange(project_jobs_key, 0, -1)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to get project jobs")
 
     def link_job_to_project(self, project_id: str, job_id: str):
         """Link a job to a project"""
         project_jobs_key = f"project_jobs:{project_id}"
-        self.redis.lpush(project_jobs_key, job_id)
+        timestamp = datetime.now(timezone.utc).timestamp()
+        self.redis.zadd(project_jobs_key, {job_id: timestamp})
         
         # Update project job count and last analysis time
         self.increment_job_count(project_id)

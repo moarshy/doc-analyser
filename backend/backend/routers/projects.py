@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, List
 from backend.services.auth_service import get_current_user
 from backend.models.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse
@@ -17,7 +17,6 @@ async def create_project(
     """Create a new project"""
     try:
         project = project_service.create_project(current_user['id'], project_data)
-        logger.info(f"Created project: {project}")
         return ProjectResponse(**project.model_dump())
     except Exception as e:
         logger.error(f"Failed to create project: {str(e)}")
@@ -25,16 +24,11 @@ async def create_project(
 
 @router.get("/", response_model=ProjectListResponse)
 async def list_projects(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
     current_user: Dict = Depends(get_current_user)
 ):
-    """List user's projects with pagination"""
+    """List user's projects"""
     try:
-        projects, total = project_service.list_user_projects(
-            current_user['id'], page, per_page
-        )
-        
+        projects, total = project_service.list_user_projects(current_user['id'])
         project_responses = [
             ProjectResponse(**project.model_dump()) 
             for project in projects
@@ -43,8 +37,8 @@ async def list_projects(
         return ProjectListResponse(
             projects=project_responses,
             total=total,
-            page=page,
-            per_page=per_page
+            page=1,
+            per_page=total
         )
     except Exception as e:
         logger.error(f"Failed to list projects: {str(e)}")

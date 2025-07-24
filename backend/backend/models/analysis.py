@@ -47,6 +47,8 @@ class AnalysisResult(BaseModel):
     use_cases: List[dict]
     results: Optional[dict] = None
     error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class AnalysisDetail(BaseModel):
