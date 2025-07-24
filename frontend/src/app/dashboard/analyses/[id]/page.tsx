@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Clock, CheckCircle, AlertCircle, FileCode, Activity, Globe, ChevronRight, FileText, Container } from 'lucide-react';
+import { JobProgress } from '@/components/JobProgress';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface UseCase {
@@ -124,12 +125,24 @@ export default function AnalysisDetailPage() {
         });
         
         setAnalysis(response.data);
+        setJobStatus(response.data.status || 'completed');
+        
+        // If job is still running, continue polling
+        const activeStatuses = ['pending', 'cloning', 'extracting', 'executing'];
+        if (activeStatuses.includes(response.data.status)) {
+          setIsPolling(true);
+        } else {
+          setIsPolling(false);
+        }
       } catch (err: any) {
         if (err.response?.status === 404) {
           setError('Analysis not found');
+          setJobStatus('not_found');
         } else {
           setError('Failed to load analysis');
+          setJobStatus('error');
         }
+        setIsPolling(false);
       } finally {
         setIsLoading(false);
       }
@@ -137,6 +150,32 @@ export default function AnalysisDetailPage() {
 
     fetchAnalysis();
   }, [apiClient, jobId]);
+
+  // Polling mechanism for active jobs
+  useEffect(() => {
+    if (!isPolling || !apiClient || !jobId) return;
+
+    const pollJobStatus = async () => {
+      try {
+        const response = await apiClient.getAnalysisDetail(jobId);
+        const newStatus = response.data.status;
+        setAnalysis(response.data);
+        setJobStatus(newStatus);
+        
+        // Stop polling when job is complete
+        const finalStatuses = ['completed', 'failed', 'completed_with_errors'];
+        if (finalStatuses.includes(newStatus)) {
+          setIsPolling(false);
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+        setIsPolling(false);
+      }
+    };
+
+    const interval = setInterval(pollJobStatus, 3000);
+    return () => clearInterval(interval);
+  }, [isPolling, apiClient, jobId]);
 
   const fetchUseCaseFiles = async (index: number) => {
     if (!apiClient || !jobId || useCaseFiles[index]) return;
@@ -231,6 +270,38 @@ export default function AnalysisDetailPage() {
         <div className="flex-1 p-6">
           <Skeleton className="h-8 w-48 mb-6" />
           <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Show progress for active jobs
+  const activeStatuses = ['pending', 'cloning', 'extracting', 'executing'];
+  if (analysis && activeStatuses.includes(analysis.status)) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="mb-6"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          
+          <JobProgress 
+            jobId={jobId}
+            onComplete={() => {
+              setIsPolling(false);
+              window.location.reload(); // Reload to show final results
+            }}
+            onError={(error) => {
+              setError(error);
+              setIsPolling(false);
+            }}
+          />
         </div>
       </div>
     );
