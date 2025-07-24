@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Folder, Calendar, Activity, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Plus, Folder, Calendar, Activity, MoreVertical, Edit, Trash2, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { DEMO_PROJECT } from '@/lib/demo-data';
 
 interface Project {
   id: string;
@@ -54,7 +55,17 @@ export function ProjectList({ onCreateProject, onSelectProject, onEditProject, o
 
     try {
       const response = await apiClient.getProjects();
-      setProjects(response.data.projects || []);
+      const userProjects = response.data.projects || [];
+      
+      // Add demo project at the top
+      const demoProjectWithStats = {
+        ...DEMO_PROJECT,
+        job_count: 16,
+        last_analysis_at: DEMO_PROJECT.updated_at,
+        status: 'active' as const
+      };
+      
+      setProjects([demoProjectWithStats, ...userProjects]);
     } catch (err: any) {
       setError('Failed to load projects');
     } finally {
@@ -181,41 +192,51 @@ export function ProjectList({ onCreateProject, onSelectProject, onEditProject, o
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                      {project.id === 'demo-guardrails-project' && (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                          <Sparkles className="mr-1 h-3 w-3" />
+                          Demo
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
                       {project.status}
                     </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger 
-                        className="p-1 hover:bg-gray-100 rounded"
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="h-4 w-4 text-gray-500" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem 
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
-                            onEditProject?.(project);
-                          }}
+                    {project.id !== 'demo-guardrails-project' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger 
+                          className="p-1 hover:bg-gray-100 rounded"
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
                         >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Project
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
-                            handleDeleteClick(project);
-                          }}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Project
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <MoreVertical className="h-4 w-4 text-gray-500" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem 
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              onEditProject?.(project);
+                            }}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Project
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              handleDeleteClick(project);
+                            }}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
                 {project.description && (

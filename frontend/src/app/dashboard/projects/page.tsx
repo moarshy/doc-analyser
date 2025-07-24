@@ -43,8 +43,13 @@ export default function ProjectsPage() {
   };
 
   const handleSelectProject = (project: Project) => {
-    // Navigate to individual project page
-    router.push(`/dashboard/projects/${project.id}`);
+    // Handle demo project special case
+    if (project.id === 'demo-guardrails-project') {
+      router.push('/dashboard/analyses/demo-guardrails-project');
+    } else {
+      // Navigate to individual project page
+      router.push(`/dashboard/projects/${project.id}`);
+    }
   };
 
   const handleEditProject = (project: Project) => {
