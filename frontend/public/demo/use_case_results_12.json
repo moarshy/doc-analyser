@@ -1,0 +1,7 @@
+{
+  "use_case_name": "Recipe Generation with Dietary Constraints",
+  "use_case_index": 12,
+  "error": "Command failed with exit code 1 (exit code: 1)\nError output: \u26a0\ufe0f  [BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests.",
+  "success": false,
+  "timestamp": "2025-07-24T06:11:33.492709+00:00"
+}

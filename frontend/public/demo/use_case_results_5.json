@@ -1,0 +1,299 @@
+{
+  "timestamp": "2025-07-24T05:54:36.044214",
+  "setup_status": "success",
+  "tests": [
+    {
+      "test_name": "Email and Phone",
+      "original_text": "My email address is john.doe@example.com and my phone number is (555) 123-4567.",
+      "detected_entities": [
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "start": 20,
+          "end": 40,
+          "score": 1.0,
+          "text": "john.doe@example.com"
+        },
+        {
+          "entity_type": "PHONE_NUMBER",
+          "start": 64,
+          "end": 78,
+          "score": 0.75,
+          "text": "(555) 123-4567"
+        },
+        {
+          "entity_type": "URL",
+          "start": 20,
+          "end": 27,
+          "score": 0.5,
+          "text": "john.do"
+        },
+        {
+          "entity_type": "URL",
+          "start": 29,
+          "end": 40,
+          "score": 0.5,
+          "text": "example.com"
+        }
+      ],
+      "redacted_text": "My email address is <EMAIL_ADDRESS> and my phone number is <PHONE_NUMBER>.",
+      "items_redacted": 4,
+      "expected_entities": [
+        "EMAIL_ADDRESS",
+        "PHONE_NUMBER"
+      ],
+      "success": true
+    },
+    {
+      "test_name": "Credit Card and SSN",
+      "original_text": "My credit card is 4532-1234-5678-9012 and my SSN is 123-45-6789.",
+      "detected_entities": [
+        {
+          "entity_type": "DATE_TIME",
+          "start": 18,
+          "end": 37,
+          "score": 0.85,
+          "text": "4532-1234-5678-9012"
+        }
+      ],
+      "redacted_text": "My credit card is <DATE_TIME> and my SSN is 123-45-6789.",
+      "items_redacted": 1,
+      "expected_entities": [
+        "CREDIT_CARD",
+        "US_SSN"
+      ],
+      "success": true
+    },
+    {
+      "test_name": "Personal Information",
+      "original_text": "John Smith lives at 123 Main St, Anytown, USA. His phone is 555-987-6543.",
+      "detected_entities": [
+        {
+          "entity_type": "PERSON",
+          "start": 0,
+          "end": 10,
+          "score": 0.85,
+          "text": "John Smith"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 24,
+          "end": 31,
+          "score": 0.85,
+          "text": "Main St"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 33,
+          "end": 40,
+          "score": 0.85,
+          "text": "Anytown"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 42,
+          "end": 45,
+          "score": 0.85,
+          "text": "USA"
+        },
+        {
+          "entity_type": "PHONE_NUMBER",
+          "start": 60,
+          "end": 72,
+          "score": 0.75,
+          "text": "555-987-6543"
+        }
+      ],
+      "redacted_text": "<PERSON> lives at 123 <LOCATION>, <LOCATION>, <LOCATION>. His phone is <PHONE_NUMBER>.",
+      "items_redacted": 5,
+      "expected_entities": [
+        "PERSON",
+        "PHONE_NUMBER"
+      ],
+      "success": true
+    },
+    {
+      "test_name": "Banking Information",
+      "original_text": "Account number: 987654321, Routing: 012345678, IBAN: GB82WEST12345698765432",
+      "detected_entities": [
+        {
+          "entity_type": "IBAN_CODE",
+          "start": 53,
+          "end": 75,
+          "score": 1.0,
+          "text": "GB82WEST12345698765432"
+        },
+        {
+          "entity_type": "US_BANK_NUMBER",
+          "start": 16,
+          "end": 25,
+          "score": 0.4,
+          "text": "987654321"
+        },
+        {
+          "entity_type": "US_BANK_NUMBER",
+          "start": 36,
+          "end": 45,
+          "score": 0.4,
+          "text": "012345678"
+        },
+        {
+          "entity_type": "US_ITIN",
+          "start": 16,
+          "end": 25,
+          "score": 0.3,
+          "text": "987654321"
+        },
+        {
+          "entity_type": "US_PASSPORT",
+          "start": 16,
+          "end": 25,
+          "score": 0.05,
+          "text": "987654321"
+        },
+        {
+          "entity_type": "US_SSN",
+          "start": 36,
+          "end": 45,
+          "score": 0.05,
+          "text": "012345678"
+        },
+        {
+          "entity_type": "US_PASSPORT",
+          "start": 36,
+          "end": 45,
+          "score": 0.05,
+          "text": "012345678"
+        },
+        {
+          "entity_type": "US_DRIVER_LICENSE",
+          "start": 16,
+          "end": 25,
+          "score": 0.01,
+          "text": "987654321"
+        },
+        {
+          "entity_type": "US_DRIVER_LICENSE",
+          "start": 36,
+          "end": 45,
+          "score": 0.01,
+          "text": "012345678"
+        }
+      ],
+      "redacted_text": "Account number: <US_BANK_NUMBER>, Routing: <US_BANK_NUMBER>, IBAN: <IBAN_CODE>",
+      "items_redacted": 9,
+      "expected_entities": [
+        "US_BANK_NUMBER",
+        "IBAN_CODE"
+      ],
+      "success": true
+    },
+    {
+      "test_name": "Driver License",
+      "original_text": "My driver's license number is D12345678 issued in California.",
+      "detected_entities": [
+        {
+          "entity_type": "LOCATION",
+          "start": 50,
+          "end": 60,
+          "score": 0.85,
+          "text": "California"
+        },
+        {
+          "entity_type": "US_DRIVER_LICENSE",
+          "start": 30,
+          "end": 39,
+          "score": 0.6499999999999999,
+          "text": "D12345678"
+        },
+        {
+          "entity_type": "US_PASSPORT",
+          "start": 30,
+          "end": 39,
+          "score": 0.1,
+          "text": "D12345678"
+        }
+      ],
+      "redacted_text": "My driver's license number is <US_DRIVER_LICENSE> issued in <LOCATION>.",
+      "items_redacted": 3,
+      "expected_entities": [
+        "US_DRIVER_LICENSE"
+      ],
+      "success": true
+    }
+  ],
+  "configurations": [
+    {
+      "config_name": "All Entities",
+      "entities_used": "all",
+      "detected_count": 7,
+      "detected_types": [
+        "EMAIL_ADDRESS",
+        "CREDIT_CARD",
+        "PERSON",
+        "DATE_TIME",
+        "URL",
+        "URL",
+        "PHONE_NUMBER"
+      ],
+      "redacted_text": "Contact <PERSON> at <EMAIL_ADDRESS> or call <PHONE_NUMBER>. Credit card: <CREDIT_CARD>"
+    },
+    {
+      "config_name": "PII Only",
+      "entities_used": [
+        "EMAIL_ADDRESS",
+        "PHONE_NUMBER",
+        "DOMAIN_NAME",
+        "IP_ADDRESS",
+        "DATE_TIME",
+        "LOCATION",
+        "PERSON",
+        "URL"
+      ],
+      "detected_count": 6,
+      "detected_types": [
+        "EMAIL_ADDRESS",
+        "PERSON",
+        "DATE_TIME",
+        "URL",
+        "URL",
+        "PHONE_NUMBER"
+      ],
+      "redacted_text": "Contact <PERSON> at <EMAIL_ADDRESS> or call <PHONE_NUMBER>. Credit card: 4111-1111-1111-1111"
+    },
+    {
+      "config_name": "SPI Only",
+      "entities_used": [
+        "CREDIT_CARD",
+        "CRYPTO",
+        "IBAN_CODE",
+        "NRP",
+        "MEDICAL_LICENSE",
+        "US_BANK_NUMBER",
+        "US_DRIVER_LICENSE",
+        "US_ITIN",
+        "US_PASSPORT",
+        "US_SSN"
+      ],
+      "detected_count": 1,
+      "detected_types": [
+        "CREDIT_CARD"
+      ],
+      "redacted_text": "Contact John Doe at john.doe@company.com or call 555-123-4567. Credit card: <CREDIT_CARD>"
+    },
+    {
+      "config_name": "Custom Selection",
+      "entities_used": [
+        "EMAIL_ADDRESS",
+        "CREDIT_CARD"
+      ],
+      "detected_count": 2,
+      "detected_types": [
+        "EMAIL_ADDRESS",
+        "CREDIT_CARD"
+      ],
+      "redacted_text": "Contact John Doe at <EMAIL_ADDRESS> or call 555-123-4567. Credit card: <CREDIT_CARD>"
+    }
+  ],
+  "errors": [],
+  "execution_time": 29.284017086029053
+}

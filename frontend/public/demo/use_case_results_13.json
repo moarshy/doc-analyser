@@ -1,0 +1,7 @@
+{
+  "use_case_name": "Secret/Key Detection and Removal",
+  "use_case_index": 13,
+  "error": "Command failed with exit code 1 (exit code: 1)",
+  "success": false,
+  "timestamp": "2025-07-24T06:11:55.214497+00:00"
+}

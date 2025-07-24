@@ -1,0 +1,7 @@
+{
+  "use_case_name": "Safe Translation with Profanity Checking",
+  "use_case_index": 10,
+  "error": "Command failed with exit code 1 (exit code: 1)",
+  "success": false,
+  "timestamp": "2025-07-24T06:09:44.250904+00:00"
+}

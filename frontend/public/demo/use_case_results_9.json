@@ -1,0 +1,7 @@
+{
+  "use_case_name": "Content Safety and Toxicity Filtering",
+  "use_case_index": 9,
+  "error": "Command failed with exit code 1 (exit code: 1)",
+  "success": false,
+  "timestamp": "2025-07-24T06:09:46.372257+00:00"
+}

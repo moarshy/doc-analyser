@@ -1,0 +1,7 @@
+{
+  "use_case_name": "Valid Chess Move Generation",
+  "use_case_index": 14,
+  "error": "Command failed with exit code 1 (exit code: 1)",
+  "success": false,
+  "timestamp": "2025-07-24T06:12:05.245026+00:00"
+}
