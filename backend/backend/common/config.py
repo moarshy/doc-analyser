@@ -30,7 +30,7 @@ class Config(BaseSettings):
     AUTH0_AUDIENCE: str = ""
 
     # Data directory
-    DATA_DIR: str = os.getenv("DATA_DIR", "/app/data")
+    DATA_DIR: str = "/app/data"
 
     # Docker sandboxsettings
     DOCKER_IMAGE: str = "python:3.11-slim"
