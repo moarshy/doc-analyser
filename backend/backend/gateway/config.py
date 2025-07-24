@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     AUTH0_DOMAIN: str = ""
     AUTH0_AUDIENCE: str = ""
 
+    DATA_DIR: str = os.getenv("DATA_DIR", "/Users/arshath/play/naptha/doc-analyser/data")
+
     class Config:
         # Try multiple possible .env file locations
         env_file = [

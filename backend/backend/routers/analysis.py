@@ -8,6 +8,7 @@ from backend.models.analysis import AnalysisStatus, AnalysisResult, AnalysisDeta
 from backend.services.analysis_service import AnalysisService
 from backend.services.auth_service import get_current_user
 from backend.services.project_service import project_service
+from backend.gateway.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -96,24 +97,28 @@ async def get_analysis_file(
         
         # Check if job belongs to user
         job_data = service.redis.get_job(job_id)
-        if not job_data or job_data.get("job_params", {}).get("user_id") != current_user['id']:
+        if not job_data or job_data.get("user_id") != current_user['id']:
+            logger.warning(f"Access denied for user {current_user['id']} trying to access job {job_id}")
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Construct file path
-        import os
-        data_dir = os.getenv("DATA_DIR", "/data")
+        data_dir = settings.DATA_DIR
         file_path = os.path.join(data_dir, str(job_id), "data", filename)
-        
+                
         if not os.path.exists(file_path):
+            logger.warning(f"File not found: {file_path}")
             raise HTTPException(status_code=404, detail="File not found")
         
         # Security check - ensure file is within job directory
-        if not file_path.startswith(os.path.join(data_dir, str(job_id))):
+        expected_dir = os.path.join(data_dir, str(job_id))
+        if not file_path.startswith(expected_dir):
+            logger.warning(f"Invalid file path: {file_path} not in {expected_dir}")
             raise HTTPException(status_code=403, detail="Invalid file path")
             
         return FileResponse(file_path, media_type='text/plain')
         
     except Exception as e:
+        logger.error(f"Error getting analysis file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

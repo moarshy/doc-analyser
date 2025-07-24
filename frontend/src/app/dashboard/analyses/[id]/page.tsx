@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Clock, CheckCircle, AlertCircle, FileCode, Activity, Globe, ChevronRight, Play, Code, FileText, Container } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, AlertCircle, FileCode, Activity, Globe, ChevronRight, FileText, Container } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface UseCase {
@@ -45,16 +45,21 @@ interface AnalysisJob {
 }
 
 interface UseCaseResult {
-  execution_status: string;
-  execution_results: string;
-  documentation_sources_used: string[];
-  documentation_usefulness: string[];
-  documentation_weaknesses: string[];
-  documentation_improvements: string[];
-  code_file_path: string;
-  execution_time: string;
-  success_criteria_met: string[];
-  challenges_encountered: string[];
+  execution_status?: string;
+  execution_results?: string;
+  documentation_sources_used?: string[];
+  documentation_usefulness?: string[];
+  documentation_weaknesses?: string[];
+  documentation_improvements?: string[];
+  code_file_path?: string;
+  execution_time?: string;
+  success_criteria_met?: string[];
+  challenges_encountered?: string[];
+  use_case_name?: string;
+  use_case_index?: number;
+  error?: string;
+  success?: boolean;
+  timestamp?: string;
 }
 
 const getStatusIcon = (status: string) => {
@@ -92,6 +97,9 @@ export default function AnalysisDetailPage() {
   const [selectedUseCaseIndex, setSelectedUseCaseIndex] = useState(0);
   const [useCaseFiles, setUseCaseFiles] = useState<{[key: number]: {code: string, results: UseCaseResult | null}}>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [jobStatus, setJobStatus] = useState<string>('loading');
+  const [isPolling, setIsPolling] = useState(true);
+  const [jobLogs, setJobLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('details');
 
@@ -134,6 +142,8 @@ export default function AnalysisDetailPage() {
     if (!apiClient || !jobId || useCaseFiles[index]) return;
 
     try {
+      console.log(`🔍 Fetching files for use case ${index} in job ${jobId}`);
+      
       // Try to fetch the code file (could be .py, .js, .ts, etc.)
       const codeExtensions = ['py', 'js', 'ts', 'java', 'cpp', 'c', 'go'];
       let codeContent = '';
@@ -142,9 +152,10 @@ export default function AnalysisDetailPage() {
         try {
           const codeResponse = await apiClient.getAnalysisFile(jobId, `use_case_${index}.${ext}`);
           codeContent = codeResponse.data;
+          console.log(`✅ Found code file: use_case_${index}.${ext}`);
           break;
         } catch (e) {
-          // Try next extension
+          console.log(`❌ Code file not found: use_case_${index}.${ext}`);
         }
       }
 
@@ -152,9 +163,32 @@ export default function AnalysisDetailPage() {
       let resultsContent = null;
       try {
         const resultsResponse = await apiClient.getAnalysisFile(jobId, `use_case_results_${index}.json`);
-        resultsContent = JSON.parse(resultsResponse.data);
+        // Clean the JSON to handle bad control characters
+        const cleanJson = resultsResponse.data
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+          .replace(/\t/g, '  ') // Replace tabs with spaces
+          .replace(/\r\n/g, '\n') // Normalize line endings
+          .replace(/\r/g, '\n');
+        resultsContent = JSON.parse(cleanJson);
+        console.log('✅ Results JSON found:', resultsContent);
       } catch (e) {
-        // Results file might not exist
+        console.error('❌ Results file not found or invalid JSON:', e);
+        // Try to display the raw content if JSON parsing fails
+        try {
+          const resultsResponse = await apiClient.getAnalysisFile(jobId, `use_case_results_${index}.json`);
+          resultsContent = {
+            execution_status: 'error',
+            execution_results: `Error parsing JSON: ${e.message}\n\nRaw content:\n${resultsResponse.data.substring(0, 500)}...`,
+            documentation_sources_used: [],
+            documentation_usefulness: [],
+            documentation_weaknesses: [],
+            documentation_improvements: [],
+            success_criteria_met: [],
+            challenges_encountered: [`JSON parsing error: ${e.message}`]
+          };
+        } catch (fallbackError) {
+          console.error('❌ Fallback also failed:', fallbackError);
+        }
       }
 
       setUseCaseFiles(prev => ({
@@ -317,14 +351,18 @@ export default function AnalysisDetailPage() {
               </CardHeader>
               <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsList className="grid w-full grid-cols-3 mb-6">
                     <TabsTrigger value="details" className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
-                      Use Case Details
+                      Details
+                    </TabsTrigger>
+                    <TabsTrigger value="code" className="flex items-center gap-2">
+                      <FileCode className="h-4 w-4" />
+                      Code
                     </TabsTrigger>
                     <TabsTrigger value="results" className="flex items-center gap-2">
-                      <Code className="h-4 w-4" />
-                      Results & Files
+                      <Activity className="h-4 w-4" />
+                      Results
                     </TabsTrigger>
                   </TabsList>
 
@@ -393,7 +431,7 @@ export default function AnalysisDetailPage() {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="results">
+                  <TabsContent value="code">
                     <div className="space-y-6">
                       {/* Generated Code */}
                       {selectedFiles?.code && (
@@ -408,55 +446,6 @@ export default function AnalysisDetailPage() {
                             <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-sm">
                               <code>{selectedFiles.code}</code>
                             </pre>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* Execution Results */}
-                      {selectedFiles?.results && (
-                        <Card className="dark:bg-slate-700 dark:border-slate-600">
-                          <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                              <Play className="h-5 w-5" />
-                              Execution Results
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div>
-                              <p className="font-medium text-sm mb-2">Status:</p>
-                              <Badge className={selectedFiles.results.execution_status === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}>
-                                {selectedFiles.results.execution_status}
-                              </Badge>
-                            </div>
-                            
-                            <div>
-                              <p className="font-medium text-sm mb-2">Results:</p>
-                              <div className="bg-slate-50 dark:bg-slate-600 p-3 rounded border text-sm whitespace-pre-wrap">
-                                {selectedFiles.results.execution_results}
-                              </div>
-                            </div>
-
-                            {selectedFiles.results.documentation_usefulness && (
-                              <div>
-                                <p className="font-medium text-sm mb-2">Documentation Usefulness:</p>
-                                <ul className="list-disc list-inside space-y-1 text-sm">
-                                  {selectedFiles.results.documentation_usefulness.map((item: string, idx: number) => (
-                                    <li key={idx}>{item}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {selectedFiles.results.documentation_weaknesses && (
-                              <div>
-                                <p className="font-medium text-sm mb-2">Documentation Weaknesses:</p>
-                                <ul className="list-disc list-inside space-y-1 text-sm">
-                                  {selectedFiles.results.documentation_weaknesses.map((item: string, idx: number) => (
-                                    <li key={idx}>{item}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
                           </CardContent>
                         </Card>
                       )}
@@ -476,6 +465,174 @@ export default function AnalysisDetailPage() {
                             </pre>
                           </CardContent>
                         </Card>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="results">
+                    <div className="space-y-6">
+                      {selectedFiles?.results && (
+                        <>
+                          {/* Error Case */}
+                          {selectedFiles.results.error && (
+                            <Card className="dark:bg-red-900/20 border-red-200 dark:border-red-700">
+                              <CardHeader>
+                                <CardTitle className="text-lg text-red-800 dark:text-red-200">Execution Failed</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <AlertCircle className="h-5 w-5 text-red-500" />
+                                  <Badge variant="destructive">Failed</Badge>
+                                </div>
+                                <pre className="bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-3 rounded text-sm whitespace-pre-wrap font-mono">
+                                  {selectedFiles.results.error}
+                                </pre>
+                                {selectedFiles.results.timestamp && (
+                                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                                    Failed at: {new Date(selectedFiles.results.timestamp).toLocaleString()}
+                                  </p>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {/* Success Case */}
+                          {!selectedFiles.results.error && selectedFiles.results.success !== false && (
+                            <>
+                              {/* Execution Status */}
+                              <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                <CardHeader>
+                                  <CardTitle className="text-lg">Execution Status</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <Badge className={selectedFiles.results.execution_status === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}>
+                                    {selectedFiles.results.execution_status || 'Unknown'}
+                                  </Badge>
+                                  {selectedFiles.results.execution_time && (
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                                      Completed in: {selectedFiles.results.execution_time}
+                                    </p>
+                                  )}
+                                </CardContent>
+                              </Card>
+
+                              {/* Execution Results */}
+                              {selectedFiles.results.execution_results && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Execution Results</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="bg-slate-50 dark:bg-slate-600 p-4 rounded border text-sm whitespace-pre-wrap">
+                                      {selectedFiles.results.execution_results}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {/* Success Criteria */}
+                              {selectedFiles.results.success_criteria_met?.length > 0 && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Success Criteria Met</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ul className="list-disc list-inside space-y-2">
+                                      {selectedFiles.results.success_criteria_met.map((criteria: string, idx: number) => (
+                                        <li key={idx} className="text-sm">{criteria}</li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {/* Documentation Sources */}
+                              {selectedFiles.results.documentation_sources_used?.length > 0 && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Documentation Sources Used</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ul className="space-y-2">
+                                      {selectedFiles.results.documentation_sources_used.map((source: string, idx: number) => (
+                                        <li key={idx} className="flex items-center gap-2 text-sm">
+                                          <FileText className="h-4 w-4 text-slate-400" />
+                                          <code className="bg-slate-100 dark:bg-slate-600 px-2 py-1 rounded text-xs">
+                                            {source.replace('/workspace/repo/', '')}
+                                          </code>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {/* Documentation Usefulness */}
+                              {selectedFiles.results.documentation_usefulness?.length > 0 && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Documentation Usefulness</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ul className="list-disc list-inside space-y-2">
+                                      {selectedFiles.results.documentation_usefulness.map((item: string, idx: number) => (
+                                        <li key={idx} className="text-sm">{item}</li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {/* Documentation Weaknesses */}
+                              {selectedFiles.results.documentation_weaknesses?.length > 0 && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Documentation Weaknesses</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ul className="list-disc list-inside space-y-2">
+                                      {selectedFiles.results.documentation_weaknesses.map((item: string, idx: number) => (
+                                        <li key={idx} className="text-sm">{item}</li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {/* Documentation Improvements */}
+                              {selectedFiles.results.documentation_improvements?.length > 0 && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Suggested Improvements</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ul className="list-disc list-inside space-y-2">
+                                      {selectedFiles.results.documentation_improvements.map((item: string, idx: number) => (
+                                        <li key={idx} className="text-sm">{item}</li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
+
+                              {/* Challenges Encountered */}
+                              {selectedFiles.results.challenges_encountered?.length > 0 && (
+                                <Card className="dark:bg-slate-700 dark:border-slate-600">
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">Challenges & Solutions</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ul className="list-disc list-inside space-y-2">
+                                      {selectedFiles.results.challenges_encountered.map((item: string, idx: number) => (
+                                        <li key={idx} className="text-sm">{item}</li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   </TabsContent>
