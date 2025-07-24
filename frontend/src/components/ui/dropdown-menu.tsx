@@ -8,7 +8,17 @@ const DropdownMenu = ({ children }: { children: React.ReactNode }) => {
       {React.Children.map(children, child => {
         if (React.isValidElement(child)) {
           if (child.type === DropdownMenuTrigger) {
-            return React.cloneElement(child, { onClick: () => setIsOpen(!isOpen) })
+            const originalOnClick = child.props.onClick
+            return React.cloneElement(child, { 
+              onClick: (e: React.MouseEvent) => {
+                // Call the original onClick first (for stopPropagation, etc.)
+                if (originalOnClick) {
+                  originalOnClick(e)
+                }
+                // Then toggle the dropdown
+                setIsOpen(!isOpen)
+              }
+            })
           }
           if (child.type === DropdownMenuContent) {
             return isOpen ? React.cloneElement(child, { onClose: () => setIsOpen(false) }) : null
