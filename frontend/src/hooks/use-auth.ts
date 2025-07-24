@@ -42,8 +42,12 @@ export function useAuth() {
             picture: picture,
           });
           setUserSynced(true);
+          console.log('User sync successful');
         } catch (error) {
           console.error('Failed to sync user:', error);
+          // Set userSynced to true anyway to prevent infinite retries
+          // The user can still use the app, just sync will fail
+          setUserSynced(true);
         } finally {
           syncingRef.current = false;
         }

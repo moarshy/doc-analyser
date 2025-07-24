@@ -5,9 +5,53 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Plus, FolderOpen, Activity, BarChart3, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+
+interface DashboardStats {
+  totalProjects: number;
+  completedAnalyses: number;
+  pendingJobs: number;
+  issuesFound: number;
+}
 
 export default function DashboardOverview() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, apiClient } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalProjects: 0,
+    completedAnalyses: 0,
+    pendingJobs: 0,
+    issuesFound: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!apiClient || !user) return;
+      
+      try {
+        const projectsResponse = await apiClient.getProjects();
+        const projects = projectsResponse.data.projects || [];
+        
+        // Calculate stats from projects
+        const totalProjects = projects.length;
+        const completedAnalyses = projects.reduce((sum: number, project: any) => sum + (project.job_count || 0), 0);
+        
+        // For now, set pending jobs and issues to 0 since we don't have that data yet
+        setStats({
+          totalProjects,
+          completedAnalyses,
+          pendingJobs: 0,
+          issuesFound: 0
+        });
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [apiClient, user]);
 
   if (isLoading) {
     return (
@@ -47,7 +91,7 @@ export default function DashboardOverview() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-400 mb-1">Total Projects</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{statsLoading ? '...' : stats.totalProjects}</p>
                 <p className="text-xs opacity-70 mt-1">Active projects</p>
               </div>
               <div className="p-3 bg-blue-500 bg-opacity-20 rounded-full">
@@ -62,7 +106,7 @@ export default function DashboardOverview() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-green-400 mb-1">Completed Analyses</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{statsLoading ? '...' : stats.completedAnalyses}</p>
                 <p className="text-xs opacity-70 mt-1">Successfully finished</p>
               </div>
               <div className="p-3 bg-green-500 bg-opacity-20 rounded-full">
@@ -77,7 +121,7 @@ export default function DashboardOverview() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-yellow-400 mb-1">Pending Jobs</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{statsLoading ? '...' : stats.pendingJobs}</p>
                 <p className="text-xs opacity-70 mt-1">In queue</p>
               </div>
               <div className="p-3 bg-yellow-500 bg-opacity-20 rounded-full">
@@ -92,7 +136,7 @@ export default function DashboardOverview() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-purple-400 mb-1">Issues Found</p>
-                <p className="text-3xl font-bold">0</p>
+                <p className="text-3xl font-bold">{statsLoading ? '...' : stats.issuesFound}</p>
                 <p className="text-xs opacity-70 mt-1">Documentation issues</p>
               </div>
               <div className="p-3 bg-purple-500 bg-opacity-20 rounded-full">
