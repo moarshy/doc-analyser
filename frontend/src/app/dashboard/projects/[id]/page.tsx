@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ArrowLeft, Calendar, Activity, Globe, Settings, Play, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -69,6 +71,10 @@ export default function ProjectDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingAnalyses, setIsLoadingAnalyses] = useState(false);
+  
+  // Analysis form state
+  const [branch, setBranch] = useState('main');
+  const [includeFolders, setIncludeFolders] = useState('docs');
 
   const projectId = params.id as string;
 
@@ -113,12 +119,25 @@ export default function ProjectDetailsPage() {
       return;
     }
     
+    if (!branch.trim()) {
+      alert('Please specify a branch name.');
+      return;
+    }
+    
+    if (!includeFolders.trim()) {
+      alert('Please specify at least one folder to include.');
+      return;
+    }
+    
     setIsLoadingAnalyses(true);
     try {
+      // Parse include folders as comma-separated values
+      const foldersArray = includeFolders.split(',').map(f => f.trim()).filter(f => f.length > 0);
+      
       const response = await apiClient.startAnalysis({
         url: project.repository_url,
-        branch: "main",
-        include_folders: ["docs"],
+        branch: branch.trim(),
+        include_folders: foldersArray,
         project_id: projectId,
       });
       
@@ -192,16 +211,6 @@ export default function ProjectDetailsPage() {
               <Settings className="h-4 w-4" />
               Edit Project
             </Button>
-            {analyses.length === 0 && (
-              <Button 
-                onClick={handleStartAnalysis}
-                disabled={isLoadingAnalyses || !project.repository_url}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play className="h-4 w-4" />
-                {isLoadingAnalyses ? 'Starting...' : 'Start Analysis'}
-              </Button>
-            )}
           </div>
         </div>
       </div>
@@ -279,51 +288,89 @@ export default function ProjectDetailsPage() {
         </Card>
       </div>
 
-      {/* Analysis Section - Only show if no analyses exist */}
-      {analyses.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Start New Analysis</CardTitle>
-            <CardDescription>
-              Analyze your documentation to identify issues and improvements
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="p-4 border border-dashed rounded-lg text-center opacity-70">
-                {project.repository_url ? (
-                  <>
-                    <p className="mb-4 opacity-80">
-                      Ready to analyze documentation for this project?
-                    </p>
-                    <Button 
-                      onClick={handleStartAnalysis}
-                      disabled={isLoadingAnalyses}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      <Play className="mr-2 h-4 w-4" />
-                      {isLoadingAnalyses ? 'Starting...' : 'Start Analysis'}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="mb-4 opacity-80">
-                      Please set a repository URL in your project settings to start analysis.
-                    </p>
-                    <Button 
-                      onClick={handleEdit}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      Edit Project Settings
-                    </Button>
-                  </>
-                )}
+      {/* Analysis Section - Show input form for starting analysis */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Start New Analysis</CardTitle>
+          <CardDescription>
+            Analyze your documentation to identify issues and improvements
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {project.repository_url ? (
+            <div className="space-y-6">
+              {/* Analysis Configuration Form */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="branch">Git Branch</Label>
+                  <Input
+                    id="branch"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full"
+                    disabled={isLoadingAnalyses}
+                  />
+                  <p className="text-sm text-gray-500">
+                    Specify which branch to analyze (e.g., main, develop)
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="includeFolders">Include Folders</Label>
+                  <Input
+                    id="includeFolders"
+                    value={includeFolders}
+                    onChange={(e) => setIncludeFolders(e.target.value)}
+                    placeholder="docs, README.md"
+                    className="w-full"
+                    disabled={isLoadingAnalyses}
+                  />
+                  <p className="text-sm text-gray-500">
+                    Comma-separated list of folders/files to analyze
+                  </p>
+                </div>
+              </div>
+              
+              {/* Repository Info */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium text-sm">Repository:</span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 break-all">
+                  {project.repository_url}
+                </p>
+              </div>
+              
+              {/* Start Button */}
+              <div className="flex justify-center">
+                <Button 
+                  onClick={handleStartAnalysis}
+                  disabled={isLoadingAnalyses || !branch.trim() || !includeFolders.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  {isLoadingAnalyses ? 'Starting Analysis...' : 'Start Analysis'}
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="p-4 border border-dashed rounded-lg text-center opacity-70">
+              <p className="mb-4 opacity-80">
+                Please set a repository URL in your project settings to start analysis.
+              </p>
+              <Button 
+                onClick={handleEdit}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Edit Project Settings
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Analyses */}
       <Card>

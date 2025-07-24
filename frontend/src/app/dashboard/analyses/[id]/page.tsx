@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Clock, CheckCircle, AlertCircle, FileCode, Activity, Globe, ChevronRight, FileText, Container } from 'lucide-react';
-import { JobProgress } from '@/components/JobProgress';
+import { ArrowLeft, Clock, CheckCircle, AlertCircle, FileCode, Activity, Globe, ChevronRight, FileText, Container, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface UseCase {
@@ -20,6 +19,8 @@ interface UseCase {
   status?: string;
   execution_time_seconds?: number;
   container_logs?: string;
+  start_time?: number;
+  end_time?: number;
   data?: {
     name: string;
     description: string;
@@ -111,18 +112,9 @@ export default function AnalysisDetailPage() {
       if (!apiClient || !jobId) return;
 
       try {
+        // Always fetch full analysis details
         const response = await apiClient.getAnalysisDetail(jobId);
-        console.log('🔍 Full Analysis Response:', response.data);
-        console.log('🔍 Use Cases Array:', response.data.use_cases);
-        
-        // Log each use case individually
-        response.data.use_cases?.forEach((useCase: any, index: number) => {
-          console.log(`🔍 Use Case ${index}:`, useCase);
-          console.log(`   - Name: ${useCase.name || useCase.data?.name}`);
-          console.log(`   - Status: ${useCase.status}`);
-          console.log(`   - Data:`, useCase.data);
-          console.log(`   - All keys:`, Object.keys(useCase));
-        });
+        console.log('🔍 Analysis Response:', response.data);
         
         setAnalysis(response.data);
         setJobStatus(response.data.status || 'completed');
@@ -131,8 +123,10 @@ export default function AnalysisDetailPage() {
         const activeStatuses = ['pending', 'cloning', 'extracting', 'executing'];
         if (activeStatuses.includes(response.data.status)) {
           setIsPolling(true);
+          console.log('🔄 Job is active, will continue polling. Status:', response.data.status);
         } else {
           setIsPolling(false);
+          console.log('✅ Job is complete. Status:', response.data.status);
         }
       } catch (err: any) {
         if (err.response?.status === 404) {
@@ -151,34 +145,40 @@ export default function AnalysisDetailPage() {
     fetchAnalysis();
   }, [apiClient, jobId]);
 
-  // Polling mechanism for active jobs
+  // Auto-refresh for active jobs
   useEffect(() => {
     if (!isPolling || !apiClient || !jobId) return;
 
-    const pollJobStatus = async () => {
+    const refreshData = async () => {
       try {
         const response = await apiClient.getAnalysisDetail(jobId);
-        const newStatus = response.data.status;
         setAnalysis(response.data);
-        setJobStatus(newStatus);
+        setJobStatus(response.data.status);
         
         // Stop polling when job is complete
         const finalStatuses = ['completed', 'failed', 'completed_with_errors'];
-        if (finalStatuses.includes(newStatus)) {
+        if (finalStatuses.includes(response.data.status)) {
           setIsPolling(false);
+          console.log('✅ Job completed, stopped polling');
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        console.error('Auto-refresh error:', error);
         setIsPolling(false);
       }
     };
 
-    const interval = setInterval(pollJobStatus, 3000);
+    const interval = setInterval(refreshData, 3000);
     return () => clearInterval(interval);
   }, [isPolling, apiClient, jobId]);
 
   const fetchUseCaseFiles = async (index: number) => {
-    if (!apiClient || !jobId || useCaseFiles[index]) return;
+    if (!apiClient || !jobId) return;
+    
+    // Skip if files already fetched
+    if (useCaseFiles[index]) {
+      console.log(`⏭️ Files for use case ${index} already cached`);
+      return;
+    }
 
     try {
       console.log(`🔍 Fetching files for use case ${index} in job ${jobId}`);
@@ -189,12 +189,13 @@ export default function AnalysisDetailPage() {
       
       for (const ext of codeExtensions) {
         try {
+          console.log(`🔍 Trying to fetch: use_case_${index}.${ext}`);
           const codeResponse = await apiClient.getAnalysisFile(jobId, `use_case_${index}.${ext}`);
           codeContent = codeResponse.data;
-          console.log(`✅ Found code file: use_case_${index}.${ext}`);
+          console.log(`✅ Found code file: use_case_${index}.${ext}`, codeContent.substring(0, 100) + '...');
           break;
         } catch (e) {
-          console.log(`❌ Code file not found: use_case_${index}.${ext}`);
+          console.log(`❌ Code file not found: use_case_${index}.${ext}`, e);
         }
       }
 
@@ -243,10 +244,36 @@ export default function AnalysisDetailPage() {
   };
 
   useEffect(() => {
+    // Fetch files for individual completed use cases (even if job is still executing)
+    console.log('🔍 Checking for completed use cases to fetch files:', {
+      hasAnalysis: !!analysis,
+      useCasesCount: analysis?.use_cases?.length || 0,
+      jobStatus: analysis?.status
+    });
+    
     if (analysis && analysis.use_cases?.length > 0) {
-      fetchUseCaseFiles(selectedUseCaseIndex);
+      // Fetch files for any completed use cases, regardless of overall job status
+      console.log('🚀 Starting to fetch files for completed use cases...');
+      analysis.use_cases.forEach((useCase, index) => {
+        console.log(`📋 Use case ${index}: ${useCase.name} - Status: ${useCase.status} - Files cached: ${!!useCaseFiles[index]}`);
+        if (useCase.status === 'completed' && !useCaseFiles[index]) {
+          console.log(`🔥 Fetching files for completed use case ${index}: ${useCase.name}`);
+          fetchUseCaseFiles(index);
+        }
+      });
     }
-  }, [analysis, selectedUseCaseIndex]);
+  }, [analysis]);
+
+  // Also fetch files when selecting a use case (for immediate display)
+  useEffect(() => {
+    if (analysis && analysis.use_cases?.length > 0) {
+      const selectedUseCase = analysis.use_cases[selectedUseCaseIndex];
+      if (selectedUseCase?.status === 'completed' && !useCaseFiles[selectedUseCaseIndex]) {
+        console.log(`🎯 Selected use case ${selectedUseCaseIndex} is completed, fetching files...`);
+        fetchUseCaseFiles(selectedUseCaseIndex);
+      }
+    }
+  }, [selectedUseCaseIndex, analysis]);
 
   const handleBack = () => {
     if (analysis?.project_id) {
@@ -275,37 +302,6 @@ export default function AnalysisDetailPage() {
     );
   }
 
-  // Show progress for active jobs
-  const activeStatuses = ['pending', 'cloning', 'extracting', 'executing'];
-  if (analysis && activeStatuses.includes(analysis.status)) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
-        <div className="max-w-4xl mx-auto">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="mb-6"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          
-          <JobProgress 
-            jobId={jobId}
-            onComplete={() => {
-              setIsPolling(false);
-              window.location.reload(); // Reload to show final results
-            }}
-            onError={(error) => {
-              setError(error);
-              setIsPolling(false);
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
 
   if (error || !analysis) {
     return (
@@ -347,11 +343,39 @@ export default function AnalysisDetailPage() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            {getStatusIcon(analysis.status)}
-            <Badge variant={analysis.status === 'completed' ? 'default' : 'secondary'}>
-              {analysis.status}
-            </Badge>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              {getStatusIcon(analysis.status)}
+              <Badge variant={analysis.status === 'completed' ? 'default' : 'secondary'}>
+                {analysis.status}
+              </Badge>
+              {isPolling && (
+                <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Live updates</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Progress Stats */}
+            {analysis.use_cases && analysis.use_cases.length > 0 && (
+              <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span>{analysis.use_cases.filter(uc => uc.status === 'completed').length} completed</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4 text-yellow-500" />
+                  <span>{analysis.use_cases.filter(uc => uc.status === 'running' || uc.status === 'pending').length} pending</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <span>{analysis.use_cases.filter(uc => uc.status === 'failed').length} failed</span>
+                </div>
+                <span className="text-slate-400">•</span>
+                <span>{analysis.use_cases.length} total use cases</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -383,16 +407,72 @@ export default function AnalysisDetailPage() {
                             {useCase.name || `Use Case ${index + 1}`}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
+                        
+                        {/* Status Details */}
+                        <div className="mb-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge 
+                              variant={
+                                useCase.status === 'completed' ? 'default' : 
+                                useCase.status === 'failed' ? 'destructive' : 
+                                useCase.status === 'running' ? 'outline' :
+                                'secondary'
+                              }
+                              className={`text-xs font-medium ${
+                                useCase.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+                                useCase.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
+                                useCase.status === 'running' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-300' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                              }`}
+                            >
+                              {useCase.status === 'running' && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                              {useCase.status || 'pending'}
+                            </Badge>
+                            {useCase.execution_time_seconds && (
+                              <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-800">
+                                {useCase.execution_time_seconds.toFixed(1)}s
+                              </Badge>
+                            )}
+                            {/* File availability indicators */}
+                            {useCase.status === 'completed' && useCaseFiles[index] && (
+                              <div className="flex gap-1">
+                                {useCaseFiles[index]?.code && (
+                                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200">
+                                    <FileCode className="h-3 w-3 mr-1" />
+                                    Code
+                                  </Badge>
+                                )}
+                                {useCaseFiles[index]?.results && (
+                                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200">
+                                    <Activity className="h-3 w-3 mr-1" />
+                                    Results
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Running indicator with elapsed time */}
+                          {useCase.status === 'running' && useCase.start_time && (
+                            <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mt-1">
+                              <span>Running for {Math.floor((Date.now() / 1000 - useCase.start_time) / 60)}m {Math.floor((Date.now() / 1000 - useCase.start_time) % 60)}s</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mb-2">
                           {useCase.description || 'No description'}
                         </p>
-                        {useCase.difficulty_level && (
-                          <Badge className={`text-xs mt-1 ${getDifficultyColor(useCase.difficulty_level)}`}>
-                            {useCase.difficulty_level}
-                          </Badge>
-                        )}
+                        
+                        <div className="flex items-center justify-between">
+                          {useCase.difficulty_level && (
+                            <Badge className={`text-xs ${getDifficultyColor(useCase.difficulty_level)}`}>
+                              {useCase.difficulty_level}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-slate-400 ml-2" />
+                      <ChevronRight className="h-4 w-4 text-slate-400 ml-2 flex-shrink-0" />
                     </div>
                   </button>
                 ))}
@@ -556,7 +636,9 @@ export default function AnalysisDetailPage() {
                                   <Badge variant="destructive">Failed</Badge>
                                 </div>
                                 <pre className="bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-3 rounded text-sm whitespace-pre-wrap font-mono">
-                                  {selectedFiles.results.error}
+                                  {typeof selectedFiles.results.error === 'object' 
+                                    ? JSON.stringify(selectedFiles.results.error, null, 2)
+                                    : selectedFiles.results.error}
                                 </pre>
                                 {selectedFiles.results.timestamp && (
                                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
@@ -595,7 +677,9 @@ export default function AnalysisDetailPage() {
                                   </CardHeader>
                                   <CardContent>
                                     <div className="bg-slate-50 dark:bg-slate-600 p-4 rounded border text-sm whitespace-pre-wrap">
-                                      {selectedFiles.results.execution_results}
+                                      {typeof selectedFiles.results.execution_results === 'object' 
+                                        ? JSON.stringify(selectedFiles.results.execution_results, null, 2)
+                                        : selectedFiles.results.execution_results}
                                     </div>
                                   </CardContent>
                                 </Card>

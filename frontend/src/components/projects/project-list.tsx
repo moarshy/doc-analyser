@@ -175,14 +175,12 @@ export function ProjectList({ onCreateProject, onSelectProject, onEditProject, o
           {projects.map((project) => (
             <Card 
               key={project.id} 
-              className="hover:shadow-md transition-shadow relative"
+              className="hover:shadow-md transition-shadow relative cursor-pointer"
+              onClick={() => onSelectProject?.(project)}
             >
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div 
-                    className="flex-1 cursor-pointer"
-                    onClick={() => onSelectProject?.(project)}
-                  >
+                  <div className="flex-1">
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
@@ -190,7 +188,10 @@ export function ProjectList({ onCreateProject, onSelectProject, onEditProject, o
                       {project.status}
                     </Badge>
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="p-1 hover:bg-gray-100 rounded">
+                      <DropdownMenuTrigger 
+                        className="p-1 hover:bg-gray-100 rounded"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      >
                         <MoreVertical className="h-4 w-4 text-gray-500" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
@@ -223,10 +224,7 @@ export function ProjectList({ onCreateProject, onSelectProject, onEditProject, o
                   </CardDescription>
                 )}
               </CardHeader>
-              <CardContent 
-                className="cursor-pointer"
-                onClick={() => onSelectProject?.(project)}
-              >
+              <CardContent>
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
                     <Activity className="h-4 w-4" />

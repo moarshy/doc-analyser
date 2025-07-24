@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle, Clock, GitBranch, Loader2, Play, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 
 interface JobStatus {
   status: string;
@@ -38,16 +39,17 @@ const STAGE_CONFIG = {
 };
 
 export function JobProgress({ jobId, onComplete, onError }: JobProgressProps) {
+  const { apiClient } = useAuth();
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [isPolling, setIsPolling] = useState(true);
   const [logs, setLogs] = useState<string[]>([]);
 
   const fetchJobStatus = useCallback(async () => {
+    if (!apiClient) return;
+    
     try {
-      const response = await fetch(`/api/analysis/status/${jobId}`);
-      if (!response.ok) throw new Error('Failed to fetch job status');
-      
-      const data = await response.json();
+      const response = await apiClient.getAnalysisStatus(jobId);
+      const data = response.data;
       setJobStatus(data);
       
       // Update logs if available
@@ -69,10 +71,10 @@ export function JobProgress({ jobId, onComplete, onError }: JobProgressProps) {
       setIsPolling(false);
       onError?.('Failed to fetch job status');
     }
-  }, [jobId, onComplete, onError]);
+  }, [jobId, apiClient, onComplete, onError]);
 
   useEffect(() => {
-    if (!isPolling) return;
+    if (!isPolling || !apiClient) return;
 
     // Initial fetch
     fetchJobStatus();

@@ -97,7 +97,12 @@ async def get_analysis_file(
         
         # Check if job belongs to user
         job_data = service.redis.get_job(job_id)
-        if not job_data or job_data.get("user_id") != current_user['id']:
+        job_user_id = job_data.get("job_params", {}).get("user_id") if job_data else None
+        logger.info(f"Job data user_id: {job_user_id}")
+        logger.info(f"Current user id: {current_user['id']}")
+        logger.info(f"User IDs match: {job_user_id == current_user['id']}")
+        
+        if not job_data or job_data.get("job_params", {}).get("user_id") != current_user['id']:
             logger.warning(f"Access denied for user {current_user['id']} trying to access job {job_id}")
             raise HTTPException(status_code=403, detail="Access denied")
         
