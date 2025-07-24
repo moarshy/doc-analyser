@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 import logging
@@ -25,6 +26,26 @@ class DockerRunner:
         except DockerException as e:
             self.client = None
             print(f"Warning: Docker not available. Using subprocess fallback. Error: {e}")
+    
+    def _convert_to_host_path(self, container_path: str) -> str:
+        """Convert worker container path to host path for volume mounting to sandbox containers."""
+        container_path = str(container_path)
+        
+        # Get the working directory from environment (should be set by docker-compose)
+        host_working_dir = os.environ.get('HOST_WORKING_DIR', '/home/ubuntu/doc-analyser')
+        
+        # Convert /app/data paths to host paths for Docker-in-Docker mounting
+        if container_path.startswith('/app/data'):
+            # Replace /app/data with the host data path
+            # Since worker mounts ./data:/app/data, we need to map back to host ./data
+            relative_path = container_path[len('/app/data'):].lstrip('/')
+            if relative_path:
+                return f"{host_working_dir}/data/{relative_path}"
+            else:
+                return f"{host_working_dir}/data"
+        
+        # For other paths, return as-is (they should already be host paths)
+        return container_path
     
     def _ensure_network_exists(self):
         """Ensure the Docker network exists, create if it doesn't."""
@@ -53,10 +74,10 @@ class DockerRunner:
             job_dir.mkdir(parents=True, exist_ok=True)
             data_dir.mkdir(parents=True, exist_ok=True)
             
-            # Mount volumes
+            # Mount volumes (convert container paths to host paths for Docker-in-Docker)
             volumes = {
-                str(repo_dir.resolve()): {"bind": "/workspace/repo", "mode": "ro"},
-                str(data_dir.resolve()): {"bind": "/workspace/data", "mode": "rw"},
+                self._convert_to_host_path(str(repo_dir.resolve())): {"bind": "/workspace/repo", "mode": "ro"},
+                self._convert_to_host_path(str(data_dir.resolve())): {"bind": "/workspace/data", "mode": "rw"},
             }
             
             # Environment variables
@@ -111,10 +132,10 @@ class DockerRunner:
             job_dir.mkdir(parents=True, exist_ok=True)
             data_dir.mkdir(parents=True, exist_ok=True)
             
-            # Mount volumes
+            # Mount volumes (convert container paths to host paths for Docker-in-Docker)
             volumes = {
-                str(repo_dir.resolve()): {"bind": "/workspace/repo", "mode": "ro"},
-                str(data_dir.resolve()): {"bind": "/workspace/data", "mode": "rw"},
+                self._convert_to_host_path(str(repo_dir.resolve())): {"bind": "/workspace/repo", "mode": "ro"},
+                self._convert_to_host_path(str(data_dir.resolve())): {"bind": "/workspace/data", "mode": "rw"},
             }
             
             # Environment variables
@@ -168,8 +189,6 @@ class DockerRunner:
                         "error": str(e),
                         "stderr": str(e)
                     }
-            else:
-                return self._run_execution_fallback(use_case_index, repo_path, str(data_dir), include_folders)
                 
         except Exception as e:
             return {
@@ -245,10 +264,10 @@ class DockerRunner:
             repo_dir = Path(repo_path)
             data_dir = Path(output_dir)
             
-            # Mount volumes
+            # Mount volumes (convert container paths to host paths for Docker-in-Docker)
             volumes = {
-                str(repo_dir.resolve()): {"bind": "/workspace/repo", "mode": "ro"},
-                str(data_dir.resolve()): {"bind": "/workspace/data", "mode": "rw"},
+                self._convert_to_host_path(str(repo_dir.resolve())): {"bind": "/workspace/repo", "mode": "ro"},
+                self._convert_to_host_path(str(data_dir.resolve())): {"bind": "/workspace/data", "mode": "rw"},
             }
             
             # Start initial containers (up to pool_size)
