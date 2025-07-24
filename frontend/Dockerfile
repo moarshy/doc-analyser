@@ -1,14 +1,26 @@
 # Use the official Node.js runtime as the base image
 FROM node:18-alpine AS base
 
+# Accept build arguments
+ARG NEXT_PUBLIC_AUTH0_DOMAIN
+ARG NEXT_PUBLIC_AUTH0_CLIENT_ID
+ARG NEXT_PUBLIC_AUTH0_AUDIENCE
+ARG NEXT_PUBLIC_API_URL
+
+# Set environment variables for build
+ENV NEXT_PUBLIC_AUTH0_DOMAIN=$NEXT_PUBLIC_AUTH0_DOMAIN
+ENV NEXT_PUBLIC_AUTH0_CLIENT_ID=$NEXT_PUBLIC_AUTH0_CLIENT_ID
+ENV NEXT_PUBLIC_AUTH0_AUDIENCE=$NEXT_PUBLIC_AUTH0_AUDIENCE
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Set the working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install ALL dependencies (including devDependencies needed for build)
+RUN npm ci && npm cache clean --force
 
 # Copy the rest of the application code
 COPY . .
@@ -21,10 +33,12 @@ FROM node:18-alpine AS production
 
 WORKDIR /app
 
+# Copy package files and install only production dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
 # Copy built application
 COPY --from=base /app/.next ./.next
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/package*.json ./
 COPY --from=base /app/public ./public
 
 # Create a non-root user

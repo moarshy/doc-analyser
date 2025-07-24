@@ -14,8 +14,6 @@ from backend.worker.logger import tasks_logger
 from backend.common.redis_client import get_redis_client
 
 
-tasks_logger.info(f"Worker config: {config.__dict__}")
-
 class AnalysisTask(Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Handle task failure."""

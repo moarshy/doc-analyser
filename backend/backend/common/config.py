@@ -9,7 +9,12 @@ class Config(BaseSettings):
     DEBUG: bool = True
 
     # CORS settings
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "https://rune.naptha.work",
+        "http://rune.naptha.work"
+    ]
 
     # Redis settings
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -25,7 +30,7 @@ class Config(BaseSettings):
     AUTH0_AUDIENCE: str = ""
 
     # Data directory
-    DATA_DIR: str = os.getenv("DATA_DIR", "/Users/arshath/play/naptha/doc-analyser/data")
+    DATA_DIR: str = os.getenv("DATA_DIR", "/app/data")
 
     # Docker sandboxsettings
     DOCKER_IMAGE: str = "python:3.11-slim"

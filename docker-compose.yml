@@ -6,7 +6,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ./data/redis_data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -29,7 +29,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
-      - results_volume:/app/results
+      - /data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -45,56 +45,70 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - VOLUME_PATH=/app/results
+      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL}
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      - AUTH0_API_AUDIENCE=${AUTH0_API_AUDIENCE}
+      - AUTH0_ALGORITHMS=${AUTH0_ALGORITHMS}
+      - AUTH0_ISSUER=${AUTH0_ISSUER}
     depends_on:
       redis:
         condition: service_healthy
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
-      - results_volume:/app/results
+      - /data:/app/data
     restart: unless-stopped
 
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.worker
-    command: celery -A backend.worker.celery_app flower --port=5555
-    ports:
-      - "5555:5555"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      - redis
-      - worker
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5555"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # flower:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile.worker
+  #   command: celery -A backend.worker.celery_app flower --port=5555
+  #   ports:
+  #     - "5555:5555"
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - CELERY_BROKER_URL=redis://redis:6379/0
+  #     - CELERY_RESULT_BACKEND=redis://redis:6379/0
+  #   depends_on:
+  #     - redis
+  #     - worker
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:5555"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_AUTH0_DOMAIN=${NEXT_PUBLIC_AUTH0_DOMAIN}
+        - NEXT_PUBLIC_AUTH0_CLIENT_ID=${NEXT_PUBLIC_AUTH0_CLIENT_ID}
+        - NEXT_PUBLIC_AUTH0_AUDIENCE=${NEXT_PUBLIC_AUTH0_AUDIENCE}
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://gateway:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_AUTH0_DOMAIN=${NEXT_PUBLIC_AUTH0_DOMAIN}
+      - NEXT_PUBLIC_AUTH0_CLIENT_ID=${NEXT_PUBLIC_AUTH0_CLIENT_ID}
+      - NEXT_PUBLIC_AUTH0_AUDIENCE=${NEXT_PUBLIC_AUTH0_AUDIENCE}
+      - NEXT_PUBLIC_ENVIRONMENT=production
     depends_on:
       - gateway
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
       timeout: 10s
       retries: 3
 
 volumes:
-  redis_data:
   results_volume:
 
 networks:
