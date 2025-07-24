@@ -10,7 +10,7 @@ from uuid import UUID
 import docker
 from docker.errors import DockerException
 
-from backend.worker.config import config
+from backend.common.config import config
 
 logger = logging.getLogger("backend.worker.docker_runner")
 

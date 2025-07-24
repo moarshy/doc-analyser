@@ -8,7 +8,7 @@ from backend.models.analysis import AnalysisStatus, AnalysisResult, AnalysisDeta
 from backend.services.analysis_service import AnalysisService
 from backend.services.auth_service import get_current_user
 from backend.services.project_service import project_service
-from backend.gateway.config import settings
+from backend.common.config import settings
 
 logger = logging.getLogger(__name__)
 

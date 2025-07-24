@@ -8,7 +8,7 @@ from typing import Optional, Dict
 from fastapi import HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt.algorithms import RSAAlgorithm
-from backend.gateway.config import settings
+from backend.common.config import settings
 
 # logging.basicConfig(level=logging.INFO)  # Let the main app configure logging
 logger = logging.getLogger(__name__)

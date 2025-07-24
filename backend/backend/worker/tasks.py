@@ -8,7 +8,7 @@ from celery import Task
 from git import Repo
 
 from backend.worker.celery_app import celery_app
-from backend.worker.config import WorkerConfig, config
+from backend.common.config import config
 from backend.worker.docker_runner import DockerRunner
 from backend.worker.logger import tasks_logger
 from backend.common.redis_client import get_redis_client
@@ -87,7 +87,7 @@ def orchestrate_analysis(
     
     try:
         # Initialize job directories
-        data_dir = os.path.join(WorkerConfig.DATA_DIR, job_id)
+        data_dir = os.path.join(config.DATA_DIR, job_id)
         repo_dir = os.path.join(data_dir, "repo")
         output_dir = os.path.join(data_dir, "data")
         

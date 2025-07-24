@@ -236,7 +236,7 @@ def get_redis_client(redis_url: str = None) -> RedisClient:
     if redis_client is None:
         if redis_url is None:
             try:
-                from backend.worker.config import config
+                from backend.common.config import config
                 redis_url = config.REDIS_URL
             except ImportError:
                 # Fallback for testing

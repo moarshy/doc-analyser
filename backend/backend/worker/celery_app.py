@@ -1,7 +1,7 @@
 from celery import Celery
 import os
 import logging
-from backend.worker.config import config
+from backend.common.config import config
 
 logger = logging.getLogger("backend.worker.celery_app")
 
